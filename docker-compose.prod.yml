@@ -27,8 +27,7 @@ services:
     networks:
       - net
     depends_on:
-      redis_prod:
-        condition: service_healthy
+      - redis_prod
 
   worker_prod:
     build:
@@ -41,8 +40,7 @@ services:
     networks:
       - net
     depends_on:
-      redis_prod:
-        condition: service_healthy
+      - redis_prod
 
   frontend_prod:
     build:
