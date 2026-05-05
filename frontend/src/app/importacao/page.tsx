@@ -1,0 +1,315 @@
+"use client";
+import { useState, useRef } from "react";
+import useSWR from "swr";
+import { fetcher, apiFetch } from "@/lib/api";
+
+const getBase = () => {
+  if (typeof window !== "undefined") {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!envUrl || envUrl.includes("localhost")) {
+      return `http://${window.location.hostname}:8000`;
+    }
+    return envUrl;
+  }
+  return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+};
+
+interface ItemResultado {
+  exercicio: number;
+  total: number;
+  normal: number;
+  isento: number;
+  imposto_minimo: number;
+  iptu_social: number;
+  valr_venal_total: number;
+  valr_imposto_total: number;
+}
+
+interface RespostaStatus {
+  dados: ItemResultado[];
+  meta: { total_exercicios: number; total_registros: number };
+}
+
+const fmtNum = (n: number) => Number(n).toLocaleString("pt-BR");
+const fmtMoeda = (n: number) => {
+  const v = Number(n);
+  if (isNaN(v) || v === 0) return "—";
+  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+};
+
+export default function ImportacaoPage() {
+  const [arquivo1, setArquivo1] = useState<File | null>(null);
+  const [arquivo2, setArquivo2] = useState<File | null>(null);
+  const [modo, setModo] = useState<"substituir" | "acumular">("substituir");
+  const [importando, setImportando] = useState(false);
+  const [fase, setFase] = useState<"upload" | "processamento" | null>(null);
+  const [progresso, setProgresso] = useState(0);
+  const [mensagemStatus, setMensagemStatus] = useState("");
+  const [erro, setErro] = useState<string | null>(null);
+  const [sucesso, setSucesso] = useState<string | null>(null);
+  
+  const ref1 = useRef<HTMLInputElement>(null);
+  const ref2 = useRef<HTMLInputElement>(null);
+
+  const { data, mutate } = useSWR<RespostaStatus>("/api/importacao/status", fetcher);
+  const resultado = data?.dados ?? [];
+
+  async function importar() {
+    if (!arquivo1) return alert("Selecione o arquivo principal.");
+    setImportando(true);
+    setFase("upload");
+    setProgresso(0);
+    setMensagemStatus("Preparando arquivos...");
+    setErro(null);
+    setSucesso(null);
+
+    const fd = new FormData();
+    fd.append("arquivo_principal", arquivo1);
+    if (arquivo2) fd.append("arquivo_auxiliar", arquivo2);
+    fd.append("modo", modo);
+
+    const xhr = new XMLHttpRequest();
+    const BASE = getBase();
+    xhr.upload.addEventListener("progress", (e) => {
+      if (e.lengthComputable) {
+        const p = Math.round((e.loaded / e.total) * 100);
+        setProgresso(p);
+        setMensagemStatus(`Sincronizando dados... ${p}%`);
+      }
+    });
+
+    xhr.addEventListener("load", () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        const resp = JSON.parse(xhr.responseText);
+        const taskId = resp.dados?.task_id;
+        if (taskId) {
+          setFase("processamento");
+          setProgresso(0);
+          setMensagemStatus("Consolidando registros no banco...");
+          monitorarTask(taskId);
+        }
+      } else {
+        setErro("Falha no envio dos arquivos.");
+        setImportando(false);
+      }
+    });
+
+    xhr.open("POST", `${BASE}/api/importacao/upload`);
+    xhr.send(fd);
+  }
+
+  function monitorarTask(taskId: string) {
+    const interval = setInterval(async () => {
+      try {
+        const status: any = await apiFetch(`/api/importacao/task/${taskId}`);
+        
+        if (status.status === "SUCCESS" || status.status === "CONCLUIDO") {
+          clearInterval(interval);
+          setSucesso("Sincronização concluída com sucesso.");
+          setImportando(false);
+          setFase(null);
+          setArquivo1(null);
+          setArquivo2(null);
+          mutate();
+        } else if (status.status === "PROGRESS") {
+          setProgresso(status.progresso || 0);
+          setMensagemStatus(status.mensagem || "Processando...");
+        } else if (status.status === "FAILURE") {
+          clearInterval(interval);
+          setErro("Erro no processamento dos dados.");
+          setImportando(false);
+        }
+      } catch (err) {
+        // Ignora erros temporários de conexão durante o pooling
+      }
+    }, 2000);
+  }
+
+  return (
+    <div className="page active">
+      <div className="page-header">
+        <div className="page-header-row">
+          <div>
+            <div className="page-title">Sincronização de Dados</div>
+            <div className="page-subtitle">Gestão da base bruta de lançamentos imobiliários (SQL Server)</div>
+          </div>
+          {resultado.length > 0 && (
+            <div className="flex-gap-8">
+              <span className="badge badge-green">● Base Integrada</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="page-content">
+        <div className="row">
+          <div style={{ flex: "0 0 380px" }}>
+            <div className="card mb-24">
+              <div className="card-header"><div className="card-title">Upload de Arquivos (CSV)</div></div>
+              <div className="card-body">
+                <div className="form-group mb-16">
+                  <label className="form-label">Tabela Principal (Lançamentos)</label>
+                  <div className={`upload-zone ${arquivo1 ? 'has-file' : ''}`} onClick={() => ref1.current?.click()}>
+                    <input ref={ref1} type="file" accept=".csv" style={{ display: "none" }} onChange={e => setArquivo1(e.target.files?.[0] ?? null)}/>
+                    <div className="zone-content">
+                      <span className="icon">{arquivo1 ? '📄' : '📁'}</span>
+                      <span className="text">{arquivo1 ? arquivo1.name : "Clique para selecionar"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group mb-20">
+                  <label className="form-label">Tabela Auxiliar (Tipos de Edif.)</label>
+                  <div className={`upload-zone ${arquivo2 ? 'has-file' : ''}`} onClick={() => ref2.current?.click()}>
+                    <input ref={ref2} type="file" accept=".csv" style={{ display: "none" }} onChange={e => setArquivo2(e.target.files?.[0] ?? null)}/>
+                    <div className="zone-content">
+                      <span className="icon">{arquivo2 ? '📄' : '📁'}</span>
+                      <span className="text">{arquivo2 ? arquivo2.name : "Opcional"}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Modo de Inserção</label>
+                  <div className="segmented-control">
+                    <button className={modo === 'substituir' ? 'active' : ''} onClick={() => setModo('substituir')}>Substituir</button>
+                    <button className={modo === 'acumular' ? 'active' : ''} onClick={() => setModo('acumular')}>Acumular</button>
+                  </div>
+                </div>
+
+                <button className="btn btn-primary w-100 mt-20" disabled={!arquivo1 || importando} onClick={importar}>
+                  {importando ? "Sincronizando..." : "Iniciar Importação"}
+                </button>
+              </div>
+            </div>
+
+            {importando && (
+              <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
+                <div className="card-body">
+                  <div className="flex-between mb-8">
+                    <span className="text-xs fw-600 color-blue">{fase === 'upload' ? 'UPLOADING' : 'PROCESSING'}</span>
+                    <span className="text-xs text-mono fw-600">{progresso}%</span>
+                  </div>
+                  <div className="progress-bar"><div className="progress-fill" style={{ width: `${progresso}%` }}></div></div>
+                  <div className="text-xs mt-8 text-muted">{mensagemStatus}</div>
+                </div>
+              </div>
+            )}
+
+            {sucesso && <div className="alert alert-success mb-24">{sucesso}</div>}
+            {erro && <div className="alert alert-error mb-24">{erro}</div>}
+          </div>
+
+          <div style={{ flex: 1 }}>
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Inventário da Base Bruta</div>
+                <span className="badge badge-gray">{data?.meta?.total_registros ? fmtNum(data.meta.total_registros) : 0} registros</span>
+              </div>
+              <div className="card-body-flush table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Exercício</th>
+                      <th className="right">Volume</th>
+                      <th className="right">Isenções</th>
+                      <th className="right">IPTU Social</th>
+                      <th className="right">Receita Bruta</th>
+                      <th className="right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultado.length === 0 ? (
+                      <tr><td colSpan={6} className="table-empty">Nenhum dado importado no sistema.</td></tr>
+                    ) : (
+                      resultado.map((r) => (
+                        <tr key={r.exercicio}>
+                          <td className="fw-600">{r.exercicio}</td>
+                          <td className="right text-mono">{fmtNum(r.total)}</td>
+                          <td className="right text-mono">{fmtNum(r.isento)}</td>
+                          <td className="right">
+                             <span className="badge badge-blue">{fmtNum(r.iptu_social)}</span>
+                          </td>
+                          <td className="right text-mono fw-600">{fmtMoeda(r.valr_imposto_total)}</td>
+                          <td className="right">
+                            <button className="action-link color-red" onClick={() => {}}>limpar</button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style jsx>{`
+        .upload-zone {
+          border: 2px dashed var(--border);
+          border-radius: var(--radius);
+          padding: 24px;
+          text-align: center;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+        .upload-zone:hover {
+          border-color: var(--blue-mid);
+          background: var(--bg);
+        }
+        .upload-zone.has-file {
+          border-color: var(--green-mid);
+          background: var(--green-light);
+        }
+        .zone-content .icon {
+          font-size: 24px;
+          display: block;
+          margin-bottom: 8px;
+        }
+        .zone-content .text {
+          font-size: 13px;
+          font-weight: 500;
+          color: var(--text);
+        }
+        .segmented-control {
+          display: flex;
+          background: var(--bg);
+          padding: 4px;
+          border-radius: 8px;
+          border: 1px solid var(--border);
+        }
+        .segmented-control button {
+          flex: 1;
+          border: none;
+          background: none;
+          padding: 8px;
+          font-size: 12px;
+          font-weight: 500;
+          color: var(--text-muted);
+          cursor: pointer;
+          border-radius: 6px;
+        }
+        .segmented-control button.active {
+          background: white;
+          color: var(--text);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .progress-bar {
+          height: 6px;
+          background: rgba(0,0,0,0.05);
+          border-radius: 3px;
+          overflow: hidden;
+        }
+        .progress-fill {
+          height: 100%;
+          background: var(--blue-txt);
+          transition: width 0.3s ease;
+        }
+        .color-blue { color: var(--blue-txt); }
+        .color-red { color: var(--red); }
+        .w-100 { width: 100%; }
+      `}</style>
+    </div>
+  );
+}

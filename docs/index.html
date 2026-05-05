@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SimLan IPTU</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET ─────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+
+/* ─── TOKENS ─────────────────────────────────────────── */
+:root {
+  --font:        'IBM Plex Sans', sans-serif;
+  --font-mono:   'IBM Plex Mono', monospace;
+
+  --bg:          #f4f5f7;
+  --surface:     #ffffff;
+  --surface-2:   #f9fafb;
+  --surface-3:   #f3f4f6;
+
+  --border:      #e5e7eb;
+  --border-md:   #d1d5db;
+  --border-dark: #9ca3af;
+
+  --txt-1:       #111827;
+  --txt-2:       #374151;
+  --txt-3:       #6b7280;
+  --txt-4:       #9ca3af;
+
+  --blue:        #1d4ed8;
+  --blue-hover:  #1e40af;
+  --blue-light:  #eff6ff;
+  --blue-mid:    #bfdbfe;
+  --blue-txt:    #1e40af;
+
+  --green:       #059669;
+  --green-light: #ecfdf5;
+  --green-mid:   #a7f3d0;
+  --green-txt:   #065f46;
+
+  --red:         #dc2626;
+  --red-light:   #fef2f2;
+  --red-mid:     #fecaca;
+  --red-txt:     #991b1b;
+
+  --amber:       #d97706;
+  --amber-light: #fffbeb;
+  --amber-mid:   #fde68a;
+  --amber-txt:   #92400e;
+
+  --sidebar-w:   220px;
+  --header-h:    56px;
+  --radius:      6px;
+  --radius-lg:   10px;
+  --radius-xl:   14px;
+}
+
+/* ─── BASE ───────────────────────────────────────────── */
+body {
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--txt-1);
+  background: var(--bg);
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ─── SIDEBAR ────────────────────────────────────────── */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0; left: 0;
+  height: 100vh;
+  z-index: 100;
+}
+
+.sidebar-logo {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--txt-1);
+  letter-spacing: -0.3px;
+}
+.sidebar-logo-sub {
+  font-size: 11px;
+  color: var(--txt-4);
+  margin-top: 2px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 12px 10px;
+  overflow-y: auto;
+}
+
+.nav-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--txt-4);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 0 10px;
+  margin: 14px 0 6px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: var(--radius);
+  color: var(--txt-3);
+  font-size: 13px;
+  font-weight: 400;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background .12s, color .12s;
+  margin-bottom: 1px;
+}
+.nav-item:hover {
+  background: var(--surface-3);
+  color: var(--txt-1);
+}
+.nav-item.active {
+  background: var(--blue-light);
+  color: var(--blue-txt);
+  font-weight: 500;
+}
+.nav-item svg {
+  width: 15px; height: 15px;
+  flex-shrink: 0;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sidebar-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--txt-4);
+  line-height: 1.5;
+}
+
+/* ─── MAIN ───────────────────────────────────────────── */
+.main {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+  max-width: calc(100vw - var(--sidebar-w));
+}
+
+/* ─── PAGE HEADER ────────────────────────────────────── */
+.page-header {
+  padding: 28px 32px 0;
+}
+.page-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--txt-1);
+  letter-spacing: -0.4px;
+}
+.page-subtitle {
+  font-size: 13px;
+  color: var(--txt-3);
+  margin-top: 3px;
+}
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/* ─── PAGE CONTENT ───────────────────────────────────── */
+.page-content {
+  padding: 24px 32px 40px;
+  overflow-x: hidden;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* ─── DIVIDER ────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 20px 0;
+}
+
+/* ─── KPI CARDS ──────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+}
+.kpi-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--txt-4);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--txt-1);
+  letter-spacing: -0.5px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.kpi-delta {
+  font-size: 11px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.kpi-delta.up   { color: var(--red); }
+.kpi-delta.down { color: var(--green); }
+.kpi-delta.neu  { color: var(--txt-4); }
+
+/* ─── CARDS ──────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.card-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--txt-1);
+}
+.card-subtitle {
+  font-size: 11px;
+  color: var(--txt-4);
+  margin-top: 1px;
+}
+.card-body {
+  padding: 18px;
+}
+.card-body-flush {
+  padding: 0;
+}
+
+/* ─── TABLES ─────────────────────────────────────────── */
+.table-wrap { overflow-x: auto; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+thead th {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--txt-4);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  background: var(--surface-2);
+}
+thead th.right { text-align: right; }
+tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background .1s;
+}
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { background: var(--surface-2); }
+tbody td {
+  padding: 10px 14px;
+  color: var(--txt-2);
+  vertical-align: middle;
+}
+tbody td.right { text-align: right; }
+tbody td.mono  { font-family: var(--font-mono); font-size: 11px; }
+tbody td.muted { color: var(--txt-4); }
+.table-empty {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--txt-4);
+  font-size: 12px;
+}
+
+/* ─── BADGES ─────────────────────────────────────────── */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.badge-blue   { background: var(--blue-light);  color: var(--blue-txt); }
+.badge-green  { background: var(--green-light); color: var(--green-txt); }
+.badge-red    { background: var(--red-light);   color: var(--red-txt); }
+.badge-amber  { background: var(--amber-light); color: var(--amber-txt); }
+.badge-gray   { background: var(--surface-3);   color: var(--txt-3); }
+
+/* variação de faixa */
+.badge-subiu  { background: var(--red-light);   color: var(--red-txt); }
+.badge-desceu { background: var(--green-light); color: var(--green-txt); }
+.badge-igual  { background: var(--surface-3);   color: var(--txt-4); }
+
+/* ─── BUTTONS ────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 7px 13px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background .12s, box-shadow .12s;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn svg {
+  width: 13px; height: 13px;
+  stroke: currentColor; fill: none;
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.btn-primary {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+.btn-primary:hover { background: var(--blue-hover); border-color: var(--blue-hover); }
+.btn-secondary {
+  background: var(--surface);
+  color: var(--txt-2);
+  border-color: var(--border-md);
+}
+.btn-secondary:hover { background: var(--surface-2); }
+.btn-ghost {
+  background: transparent;
+  color: var(--txt-3);
+  border-color: transparent;
+}
+.btn-ghost:hover { background: var(--surface-3); color: var(--txt-1); }
+.btn-sm { font-size: 11px; padding: 5px 10px; }
+.btn-lg { font-size: 13px; padding: 10px 20px; }
+
+/* ─── FORM ELEMENTS ──────────────────────────────────── */
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--txt-2);
+  margin-bottom: 5px;
+}
+.form-hint {
+  font-size: 11px;
+  color: var(--txt-4);
+  margin-top: 4px;
+}
+input[type="text"],
+input[type="number"],
+input[type="email"],
+select,
+textarea {
+  width: 100%;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--txt-1);
+  background: var(--surface);
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius);
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  appearance: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px var(--blue-light);
+}
+input::placeholder, textarea::placeholder { color: var(--txt-4); }
+textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236b7280'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; padding-right: 28px; }
+
+/* toggle */
+.toggle-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.toggle-wrap input[type="checkbox"] {
+  width: 16px; height: 16px;
+  margin-top: 1px;
+  accent-color: var(--blue);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.toggle-label { font-size: 12px; font-weight: 500; color: var(--txt-1); }
+.toggle-hint  { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
+
+/* radio group */
+.radio-group {
+  display: flex;
+  gap: 8px;
+}
+.radio-option {
+  flex: 1;
+  border: 1px solid var(--border-md);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.radio-option:hover { border-color: var(--blue-mid); }
+.radio-option.selected {
+  border-color: var(--blue);
+  background: var(--blue-light);
+}
+.radio-option input { display: none; }
+.radio-option-label { font-size: 12px; font-weight: 500; color: var(--txt-1); }
+.radio-option-hint  { font-size: 11px; color: var(--txt-3); margin-top: 2px; }
+.radio-option.selected .radio-option-label { color: var(--blue-txt); }
+
+/* ─── DROPZONE ───────────────────────────────────────── */
+.dropzone {
+  border: 1.5px dashed var(--border-md);
+  border-radius: var(--radius-lg);
+  padding: 28px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  background: var(--surface-2);
+}
+.dropzone:hover {
+  border-color: var(--blue);
+  background: var(--blue-light);
+}
+.dropzone.has-file {
+  border-style: solid;
+  border-color: var(--green);
+  background: var(--green-light);
+}
+.dropzone-icon {
+  width: 32px; height: 32px;
+  margin: 0 auto 10px;
+  color: var(--txt-4);
+}
+.dropzone-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.dropzone-label { font-size: 12px; font-weight: 500; color: var(--txt-2); }
+.dropzone-hint  { font-size: 11px; color: var(--txt-4); margin-top: 4px; }
+.dropzone.has-file .dropzone-label { color: var(--green-txt); }
+
+/* ─── PROGRESS ───────────────────────────────────────── */
+.progress-bar {
+  height: 6px;
+  background: var(--surface-3);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--blue);
+  transition: width .3s ease;
+}
+.progress-fill.green { background: var(--green); }
+
+/* ─── STATUS DOTS ────────────────────────────────────── */
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.status-dot.green  { background: var(--green); }
+.status-dot.blue   { background: var(--blue); animation: pulse-blue 1.5s infinite; }
+.status-dot.gray   { background: var(--border-dark); }
+.status-dot.amber  { background: var(--amber); }
+
+@keyframes pulse-blue {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .4; }
+}
+
+/* ─── LAYOUT HELPERS ─────────────────────────────────── */
+.row {
+  display: flex;
+  gap: 16px;
+}
+.row > .col-6 { flex: 1; min-width: 0; }
+.row > .col-4 { flex: 0 0 calc(40% - 8px); min-width: 0; }
+.row > .col-8 { flex: 0 0 calc(60% - 8px); min-width: 0; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+
+.flex-between { display: flex; align-items: center; justify-content: space-between; }
+.flex-gap-8   { display: flex; align-items: center; gap: 8px; }
+.flex-gap-12  { display: flex; align-items: center; gap: 12px; }
+
+.mt-4  { margin-top: 4px; }
+.mt-8  { margin-top: 8px; }
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mb-4  { margin-bottom: 4px; }
+.mb-8  { margin-bottom: 8px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+
+.text-muted { color: var(--txt-3); }
+.text-mono  { font-family: var(--font-mono); font-size: 11px; }
+.text-sm    { font-size: 11px; }
+.text-xs    { font-size: 10px; }
+.fw-500     { font-weight: 500; }
+.fw-600     { font-weight: 600; }
+
+/* ─── SECTION TITLE ──────────────────────────────────── */
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--txt-4);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 12px;
+}
+
+/* ─── INLINE TABS ────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+}
+.tab-item {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--txt-3);
+  padding: 8px 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color .12s, border-color .12s;
+}
+.tab-item:hover   { color: var(--txt-1); }
+.tab-item.active  { color: var(--blue-txt); border-color: var(--blue); }
+
+/* ─── INLINE NAV TABS (sidebar interna) ──────────────── */
+.inner-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.inner-nav-item {
+  font-size: 12px;
+  padding: 7px 12px;
+  border-radius: var(--radius);
+  color: var(--txt-3);
+  cursor: pointer;
+  transition: background .1s, color .1s;
+}
+.inner-nav-item:hover  { background: var(--surface-3); color: var(--txt-1); }
+.inner-nav-item.active { background: var(--blue-light); color: var(--blue-txt); font-weight: 500; }
+
+/* ─── ACTION LINK ────────────────────────────────────── */
+.action-link {
+  font-size: 11px;
+  color: var(--blue-txt);
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: none;
+}
+.action-link:hover { text-decoration: underline; }
+
+/* ─── EMPTY STATE ────────────────────────────────────── */
+.empty-state {
+  text-align: center;
+  padding: 48px 20px;
+}
+.empty-state-icon {
+  width: 36px; height: 36px;
+  color: var(--txt-4);
+  margin: 0 auto 12px;
+}
+.empty-state-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.empty-state-title { font-size: 13px; font-weight: 500; color: var(--txt-2); margin-bottom: 4px; }
+.empty-state-hint  { font-size: 12px; color: var(--txt-4); }
+
+/* ─── PAGES: show/hide ───────────────────────────────── */
+.page { display: none; }
+.page.active { display: block; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     SIDEBAR
+══════════════════════════════════════════════════════ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-name">SimLan IPTU</div>
+    <div class="sidebar-logo-sub">Motor de Simulação · v1.0</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Principal</div>
+
+    <a class="nav-item active" onclick="showPage('dashboard')" href="#">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+
+    <a class="nav-item" onclick="showPage('importacao')" href="#">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Importação
+    </a>
+
+    <div class="nav-section-label">Configuração</div>
+
+    <a class="nav-item" onclick="showPage('parametros')" href="#">
+      <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      IPCA &amp; SELIC
+    </a>
+
+    <a class="nav-item" onclick="showPage('faixas')" href="#">
+      <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      Faixas de Alíquota
+    </a>
+
+    <div class="nav-section-label">Simulação</div>
+
+    <a class="nav-item" onclick="showPage('simulacoes')" href="#">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      Simulações
+    </a>
+
+    <div class="nav-section-label">Dados</div>
+
+    <a class="nav-item" onclick="showPage('exportar')" href="#">
+      <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Exportar
+    </a>
+
+    <a class="nav-item" onclick="showPage('auditoria')" href="#">
+      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      Auditoria
+    </a>
+
+    <div class="nav-section-label">Configuração</div>
+
+    <a class="nav-item" onclick="showPage('config-base')" href="#">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M4.93 19.07l1.41-1.41M19.07 19.07l-1.41-1.41M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+      Config. Base IPTU
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    Goiânia · SEFIN<br>
+    Exercício 2026
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN
+══════════════════════════════════════════════════════ -->
+<main class="main">
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: DASHBOARD
+────────────────────────────────────────────────────── -->
+<div class="page active" id="page-dashboard">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Dashboard</div>
+        <div class="page-subtitle">Visão geral das simulações e lançamentos do IPTU municipal</div>
+      </div>
+      <div class="flex-gap-8">
+        <select style="width:220px">
+          <option>Simulação 2027–2035 · Cenário A</option>
+          <option>Simulação 2027–2035 · Cenário B</option>
+        </select>
+        <select style="width:90px">
+          <option>2027</option><option>2028</option><option>2029</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Total de imóveis</div>
+        <div class="kpi-value">148.320</div>
+        <div class="kpi-delta neu">— sem variação</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Valor venal total</div>
+        <div class="kpi-value">R$ 31,2 bi</div>
+        <div class="kpi-delta up">↑ 4,83% vs 2026</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Imposto total</div>
+        <div class="kpi-value">R$ 432,1 M</div>
+        <div class="kpi-delta up">↑ 3,4% vs 2026</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">IPTU Social</div>
+        <div class="kpi-value">3.624</div>
+        <div class="kpi-delta down">↑ 239 imóveis</div>
+      </div>
+    </div>
+
+div>
+
+    <!-- IPTU Social + Imposto mínimo -->
+    <div class="grid-2 mt-16">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Evolução do IPTU Social</div>
+        </div>
+        <div class="card-body-flush table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Exercício</th>
+                <th class="right">Quantidade</th>
+                <th class="right">Limite vigente</th>
+                <th class="right">% do total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>2022</td><td class="right">2.400</td><td class="right mono">R$ 140.000</td><td class="right">1,70%</td></tr>
+              <tr><td>2023</td><td class="right">2.485</td><td class="right mono">R$ 149.400</td><td class="right">1,73%</td></tr>
+              <tr><td>2024</td><td class="right">2.619</td><td class="right mono">R$ 165.117</td><td class="right">1,81%</td></tr>
+              <tr><td>2025</td><td class="right">2.798</td><td class="right mono">R$ 185.346</td><td class="right">1,91%</td></tr>
+              <tr><td>2026</td><td class="right">2.923</td><td class="right mono">R$ 205.734</td><td class="right">1,98%</td></tr>
+              <tr><td><span class="badge badge-blue">2027 ✦</span></td><td class="right fw-500">3.624</td><td class="right mono fw-500">R$ 224.251</td><td class="right fw-500">2,44%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Imposto mínimo</div>
+          <div class="badge badge-amber">Art. 179 CTM</div>
+        </div>
+        <div class="card-body">
+          <div class="kpi-grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0">
+            <div class="kpi-card" style="padding:12px 14px">
+              <div class="kpi-label">Quantidade</div>
+              <div class="kpi-value" style="font-size:20px">4.218</div>
+            </div>
+            <div class="kpi-card" style="padding:12px 14px">
+              <div class="kpi-label">Valor mínimo 2027</div>
+              <div class="kpi-value" style="font-size:18px;font-family:var(--font-mono)">R$ 112,10</div>
+            </div>
+          </div>
+          <div class="text-xs text-muted mt-12">
+            Valor base R$ 100,00 atualizado pela SELIC acumulada desde 2022.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DISTRIBUIÇÃO POR FAIXA ── -->
+    <div class="mt-24" style="overflow:hidden;width:100%">
+      <div class="card" style="overflow:hidden">
+        <div class="card-header" style="flex-wrap:wrap;gap:10px">
+          <div>
+            <div class="card-title">Distribuição de imóveis por faixa de alíquota</div>
+            <div class="card-subtitle">Reais 2022–2026 · Simulados 2027+ — selecione os anos a exibir</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="text-xs text-muted fw-500" style="white-space:nowrap">Anos:</span>
+            <div id="year-toggles" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+            <div style="width:1px;height:18px;background:var(--border-md);margin:0 4px"></div>
+            <button class="btn btn-ghost btn-sm" onclick="toggleAllYears(true)">Todos</button>
+            <button class="btn btn-ghost btn-sm" onclick="toggleAllYears(false)">Limpar</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:20px;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface-2);flex-wrap:wrap">
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-3)">
+            <span style="display:inline-block;width:28px;height:2px;background:var(--border-dark)"></span>
+            Dados reais (2022–2026)
+          </span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--blue-txt)">
+            <span style="display:inline-block;width:28px;height:2px;background:var(--blue);border-top:2px dashed var(--blue);height:0"></span>
+            Dados simulados (2027+)
+          </span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-3)">
+            <span class="badge badge-desceu" style="font-size:10px;padding:1px 5px">↑</span> Crescimento na faixa
+          </span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-3)">
+            <span class="badge badge-subiu" style="font-size:10px;padding:1px 5px">↓</span> Queda na faixa
+          </span>
+        </div>
+        <div id="faixa-scroll-container" style="overflow-x:auto;overflow-y:auto;max-height:480px;width:100%;display:block;box-sizing:border-box">
+          <table id="faixa-table" style="min-width:1400px;border-collapse:collapse;white-space:nowrap">
+            <thead id="faixa-thead"></thead>
+            <tbody id="faixa-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ANOS_REAIS     = [2022,2023,2024,2025,2026];
+const ANOS_SIMULADOS = [2027,2028,2029,2030,2031,2032,2033,2034,2035];
+const TODOS_ANOS     = [...ANOS_REAIS,...ANOS_SIMULADOS];
+
+const DADOS = {
+  residencial: {
+    label:'Residencial', faixas:[
+      {label:'Faixa 1 — 0,15%', dados:{2022:31200,2023:30800,2024:30200,2025:29800,2026:29400,2027:28100,2028:27200,2029:26400,2030:25800,2031:25100,2032:24500,2033:23900,2034:23400,2035:22900}},
+      {label:'Faixa 2 — 0,20%', dados:{2022:28400,2023:29100,2024:29800,2025:30200,2026:30800,2027:32100,2028:33400,2029:34200,2030:34800,2031:35200,2032:35600,2033:35900,2034:36100,2035:36300}},
+      {label:'Faixa 3 — 0,29%', dados:{2022:19800,2023:20100,2024:20600,2025:21100,2026:21400,2027:22800,2028:23600,2029:24100,2030:24400,2031:24700,2032:24900,2033:25100,2034:25200,2035:25400}},
+      {label:'Faixa 4 — 0,40%', dados:{2022:14100,2023:14400,2024:14800,2025:15100,2026:15400,2027:14800,2028:15200,2029:15600,2030:16000,2031:16300,2032:16600,2033:16800,2034:17000,2035:17200}},
+      {label:'Faixa 5 — 0,50%', dados:{2022:7200,2023:7400,2024:7600,2025:7900,2026:8100,2027:8400,2028:8600,2029:8900,2030:9100,2031:9300,2032:9500,2033:9700,2034:9900,2035:10100}},
+      {label:'Faixa 6 — 0,55%', dados:{2022:2140,2023:2200,2024:2280,2025:2350,2026:2420,2027:2580,2028:2680,2029:2780,2030:2880,2031:2970,2032:3060,2033:3140,2034:3220,2035:3300}},
+    ]
+  },
+  nresidencial: {
+    label:'Não Residencial', faixas:[
+      {label:'Faixa 1 — 0,75%', dados:{2022:9840,2023:9600,2024:9400,2025:9200,2026:9000,2027:8600,2028:8300,2029:8100,2030:7900,2031:7700,2032:7600,2033:7500,2034:7400,2035:7300}},
+      {label:'Faixa 2 — 0,80%', dados:{2022:7200,2023:7400,2024:7600,2025:7800,2026:8000,2027:8400,2028:8700,2029:9000,2030:9200,2031:9400,2032:9600,2033:9700,2034:9800,2035:9900}},
+      {label:'Faixa 3 — 0,85%', dados:{2022:5400,2023:5600,2024:5800,2025:5900,2026:6000,2027:6300,2028:6500,2029:6700,2030:6900,2031:7000,2032:7100,2033:7200,2034:7300,2035:7400}},
+      {label:'Faixa 4 — 0,90%', dados:{2022:3600,2023:3700,2024:3800,2025:3900,2026:4000,2027:4200,2028:4400,2029:4500,2030:4600,2031:4700,2032:4800,2033:4900,2034:5000,2035:5100}},
+      {label:'Faixa 5 — 0,95%', dados:{2022:2200,2023:2300,2024:2400,2025:2500,2026:2600,2027:2800,2028:2900,2029:3000,2030:3100,2031:3200,2032:3300,2033:3400,2034:3500,2035:3600}},
+      {label:'Faixa 6 — 1,00%', dados:{2022:1400,2023:1500,2024:1600,2025:1700,2026:1800,2027:1900,2028:2000,2029:2100,2030:2200,2031:2300,2032:2400,2033:2500,2034:2600,2035:2700}},
+    ]
+  },
+  territorial: {
+    label:'Territorial', faixas:[
+      {label:'Faixa 1 — 1,00%', dados:{2022:2100,2023:2000,2024:1900,2025:1800,2026:1700,2027:1600,2028:1500,2029:1450,2030:1400,2031:1350,2032:1300,2033:1260,2034:1220,2035:1180}},
+      {label:'Faixa 2 — 1,30%', dados:{2022:1840,2023:1780,2024:1720,2025:1680,2026:1640,2027:1560,2028:1500,2029:1460,2030:1420,2031:1390,2032:1360,2033:1330,2034:1310,2035:1290}},
+      {label:'Faixa 3 — 1,60%', dados:{2022:1420,2023:1460,2024:1500,2025:1520,2026:1540,2027:1580,2028:1600,2029:1620,2030:1640,2031:1650,2032:1660,2033:1670,2034:1680,2035:1690}},
+      {label:'Faixa 4 — 1,90%', dados:{2022:1080,2023:1100,2024:1120,2025:1140,2026:1160,2027:1200,2028:1230,2029:1250,2030:1270,2031:1290,2032:1310,2033:1330,2034:1350,2035:1370}},
+      {label:'Faixa 5 — 2,20%', dados:{2022:980,2023:1000,2024:1020,2025:1040,2026:1060,2027:1090,2028:1110,2029:1130,2030:1150,2031:1170,2032:1190,2033:1210,2034:1230,2035:1250}},
+      {label:'Faixa 6 — 2,50%', dados:{2022:820,2023:840,2024:870,2025:900,2026:930,2027:970,2028:1000,2029:1030,2030:1060,2031:1090,2032:1120,2033:1150,2034:1180,2035:1210}},
+      {label:'Faixa 7 — 2,80%', dados:{2022:480,2023:500,2024:520,2025:540,2026:560,2027:590,2028:620,2029:650,2030:680,2031:710,2032:740,2033:770,2034:800,2035:830}},
+    ]
+  }
+};
+
+let anosVisiveis = new Set([2022,2023,2024,2025,2026,2027,2028]);
+
+function isReal(ano){ return ANOS_REAIS.includes(ano); }
+function fmtN(n){ return n!=null?n.toLocaleString('pt-BR'):'—'; }
+
+function delta(vAtual,vAnterior){
+  if(!vAtual||!vAnterior) return '';
+  const pct=((vAtual-vAnterior)/vAnterior*100).toFixed(1);
+  // verde = crescimento (mais imóveis na base), vermelho = queda
+  const cls=pct>0.5?'badge-desceu':pct<-0.5?'badge-subiu':'badge-igual';
+  const sinal=pct>0?'↑':pct<0?'↓':'→';
+  return `<span class="badge ${cls}" style="font-size:10px;padding:1px 5px">${sinal} ${Math.abs(pct)}%</span>`;
+}
+
+function renderTabela(){
+  const anos=TODOS_ANOS.filter(a=>anosVisiveis.has(a));
+  // thead
+  const thead=document.getElementById('faixa-thead');
+  let th='<tr><th style="min-width:190px;position:sticky;left:0;background:var(--surface-2);z-index:2">Categoria / Faixa</th>';
+  anos.forEach((ano,i)=>{
+    const real=isReal(ano);
+    const bg=real?'background:var(--surface-2)':'background:var(--blue-light)';
+    const cor=real?'color:var(--txt-3)':'color:var(--blue-txt)';
+    const sim=real?'':'<span style="font-size:9px;opacity:.6;margin-left:3px">sim</span>';
+    th+=`<th class="right" style="min-width:80px;${bg};${cor}">${ano}${sim}</th>`;
+    if(i>0) th+=`<th class="right" style="min-width:58px;${bg};${cor};opacity:.8">Δ</th>`;
+  });
+  th+='</tr>';
+  thead.innerHTML=th;
+
+  // tbody
+  const tbody=document.getElementById('faixa-tbody');
+  let tb='';
+  Object.values(DADOS).forEach(cat=>{
+    const ncols=anos.length+(anos.length-1)+1;
+    tb+=`<tr style="background:var(--surface-3)"><td colspan="${ncols}" style="font-size:11px;font-weight:600;color:var(--txt-2);padding:8px 14px;text-transform:uppercase;letter-spacing:.05em;position:sticky;left:0">${cat.label}</td></tr>`;
+    cat.faixas.forEach(faixa=>{
+      tb+='<tr>';
+      tb+=`<td style="font-size:12px;color:var(--txt-3);padding-left:22px;position:sticky;left:0;background:var(--surface)">${faixa.label}</td>`;
+      anos.forEach((ano,i)=>{
+        const val=faixa.dados[ano];
+        const bg=isReal(ano)?'':'background:rgba(219,234,254,.15)';
+        tb+=`<td class="right mono" style="font-size:12px;${bg}">${fmtN(val)}</td>`;
+        if(i>0){
+          const vAnt=faixa.dados[anos[i-1]];
+          tb+=`<td class="right" style="${bg}">${delta(val,vAnt)}</td>`;
+        }
+      });
+      tb+='</tr>';
+    });
+    // linha total
+    tb+='<tr style="background:var(--surface-2);border-top:1px solid var(--border-md)">';
+    tb+=`<td style="font-size:12px;font-weight:600;color:var(--txt-2);padding-left:22px;position:sticky;left:0;background:var(--surface-2)">Total ${cat.label}</td>`;
+    anos.forEach((ano,i)=>{
+      const tot=cat.faixas.reduce((s,f)=>s+(f.dados[ano]||0),0);
+      const bg=isReal(ano)?'':'background:rgba(219,234,254,.15)';
+      tb+=`<td class="right mono fw-500" style="font-size:12px;${bg}">${fmtN(tot)}</td>`;
+      if(i>0){
+        const totAnt=cat.faixas.reduce((s,f)=>s+(f.dados[anos[i-1]]||0),0);
+        tb+=`<td class="right" style="${bg}">${delta(tot,totAnt)}</td>`;
+      }
+    });
+    tb+='</tr><tr><td colspan="99" style="height:6px;background:var(--bg)"></td></tr>';
+  });
+  tbody.innerHTML=tb;
+}
+
+function renderToggles(){
+  const c=document.getElementById('year-toggles');
+  c.innerHTML='';
+  TODOS_ANOS.forEach(ano=>{
+    const real=isReal(ano);
+    const ativo=anosVisiveis.has(ano);
+    const btn=document.createElement('button');
+    btn.className='btn btn-sm';
+    btn.textContent=ano;
+    btn.style.cssText=`font-size:11px;padding:3px 8px;border-radius:4px;
+      background:${ativo?(real?'var(--surface-3)':'var(--blue-light)'):'transparent'};
+      color:${ativo?(real?'var(--txt-2)':'var(--blue-txt)'):'var(--txt-4)'};
+      border:1px ${(ativo&&!real)?'dashed':'solid'} ${ativo?(real?'var(--border-md)':'var(--blue-mid)'):'var(--border)'};
+      font-weight:${ativo?'500':'400'};margin:0`;
+    btn.onclick=()=>{ anosVisiveis.has(ano)?anosVisiveis.delete(ano):anosVisiveis.add(ano); renderToggles(); renderTabela(); };
+    c.appendChild(btn);
+  });
+}
+
+function toggleAllYears(on){
+  if(on) TODOS_ANOS.forEach(a=>anosVisiveis.add(a)); else anosVisiveis.clear();
+  renderToggles(); renderTabela();
+}
+
+document.addEventListener('DOMContentLoaded',()=>{ renderToggles(); renderTabela(); });
+</script>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: IMPORTAÇÃO
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-importacao">
+  <div class="page-header">
+    <div class="page-title">Importação de dados</div>
+    <div class="page-subtitle">Carregue os CSVs exportados do SQL Server (SEFIN.dbo) para o banco local</div>
+  </div>
+  <div class="page-content">
+    <div class="grid-2 mb-16">
+      <div>
+        <div class="section-title">Tabela principal</div>
+        <div class="dropzone" id="dropzone1">
+          <div class="dropzone-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </div>
+          <div class="dropzone-label">SIA_LANCIPTU_ASG.csv</div>
+          <div class="dropzone-hint">Arraste o arquivo ou clique para selecionar<br>Separador: ; · Encoding: UTF-8</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-title">Tabela auxiliar — tipo de edificação</div>
+        <div class="dropzone" id="dropzone2">
+          <div class="dropzone-icon">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="12" x2="12" y2="18"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </div>
+          <div class="dropzone-label">SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN.csv</div>
+          <div class="dropzone-hint">Arraste o arquivo ou clique para selecionar<br>Separador: ; · Encoding: UTF-8</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-between mb-24">
+      <div class="text-sm text-muted">Os dados serão carregados no banco <span class="text-mono">lancamento-iptu</span> (PostgreSQL local)</div>
+      <button class="btn btn-primary">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Validar e importar
+      </button>
+    </div>
+
+    <div class="section-title">Resultado da última importação</div>
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Lançamentos por exercício</div>
+          <div class="card-subtitle">Importado em 03/05/2026 às 15:32 — 735.619 registros totais</div>
+        </div>
+        <span class="badge badge-green">
+          <span class="status-dot green"></span>
+          Concluído
+        </span>
+      </div>
+      <div class="card-body-flush table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Exercício</th>
+              <th class="right">Total</th>
+              <th class="right">Normal</th>
+              <th class="right">Isento</th>
+              <th class="right">Imp. mínimo</th>
+              <th class="right">IPTU Social</th>
+              <th class="right">Valor venal total</th>
+              <th class="right">Imposto total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>2022</td><td class="right">141.248</td><td class="right">138.412</td><td class="right">124</td><td class="right">312</td><td class="right"><span class="badge badge-blue">2.400</span></td><td class="right mono">R$ 24,1 bi</td><td class="right mono">R$ 368 M</td></tr>
+            <tr><td>2023</td><td class="right">143.821</td><td class="right">140.890</td><td class="right">118</td><td class="right">328</td><td class="right"><span class="badge badge-blue">2.485</span></td><td class="right mono">R$ 26,2 bi</td><td class="right mono">R$ 389 M</td></tr>
+            <tr><td>2024</td><td class="right">145.104</td><td class="right">142.032</td><td class="right">112</td><td class="right">341</td><td class="right"><span class="badge badge-blue">2.619</span></td><td class="right mono">R$ 27,8 bi</td><td class="right mono">R$ 404 M</td></tr>
+            <tr><td>2025</td><td class="right">146.412</td><td class="right">143.148</td><td class="right">108</td><td class="right">358</td><td class="right"><span class="badge badge-blue">2.798</span></td><td class="right mono">R$ 29,4 bi</td><td class="right mono">R$ 418 M</td></tr>
+            <tr><td>2026</td><td class="right">147.920</td><td class="right">144.521</td><td class="right">102</td><td class="right">374</td><td class="right"><span class="badge badge-blue">2.923</span></td><td class="right mono">R$ 30,8 bi</td><td class="right mono">R$ 428 M</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: PARÂMETROS
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-parametros">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">IPCA &amp; SELIC</div>
+        <div class="page-subtitle">Índices macroeconômicos por exercício — usados nas projeções do simulador</div>
+      </div>
+      <div class="flex-gap-8">
+        <button class="btn btn-secondary btn-sm">Importar série BACEN</button>
+        <button class="btn btn-primary btn-sm">+ Adicionar ano</button>
+      </div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="row">
+      <div style="flex:0 0 300px">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Adicionar / Editar</div></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Exercício (ano)</label>
+              <input type="number" placeholder="2026">
+            </div>
+            <div class="form-group">
+              <label class="form-label">IPCA acumulado (%)</label>
+              <input type="number" step="0.01" placeholder="4.83">
+              <div class="form-hint">Ex: 4.83 para 4,83%</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">SELIC acumulada (%)</label>
+              <input type="number" step="0.01" placeholder="10.50">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tipo</label>
+              <select>
+                <option>Histórico</option>
+                <option>Projetado</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Observação</label>
+              <textarea placeholder="Fonte: BACEN / IBGE"></textarea>
+            </div>
+            <button class="btn btn-primary" style="width:100%">Salvar parâmetro</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Índices cadastrados</div></div>
+          <div class="card-body-flush table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Exercício</th>
+                  <th class="right">IPCA (%)</th>
+                  <th class="right">SELIC (%)</th>
+                  <th>Tipo</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>2020</td><td class="right mono">4,52</td><td class="right mono">2,75</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr><td>2021</td><td class="right mono">10,06</td><td class="right mono">9,25</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr><td>2022</td><td class="right mono">5,79</td><td class="right mono">12,38</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr><td>2023</td><td class="right mono">4,62</td><td class="right mono">11,75</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr><td>2024</td><td class="right mono">4,83</td><td class="right mono">10,50</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr><td>2025</td><td class="right mono">5,10</td><td class="right mono">12,25</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr><td>2026</td><td class="right mono">4,90</td><td class="right mono">11,00</td><td><span class="badge badge-gray">histórico</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr style="background:var(--blue-light)"><td><strong>2027</strong></td><td class="right mono fw-500">4,00</td><td class="right mono fw-500">9,00</td><td><span class="badge badge-blue">projetado</span></td><td><a class="action-link">editar</a></td></tr>
+                <tr style="background:var(--blue-light)"><td><strong>2028</strong></td><td class="right mono fw-500">3,80</td><td class="right mono fw-500">8,50</td><td><span class="badge badge-blue">projetado</span></td><td><a class="action-link">editar</a></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: FAIXAS
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-faixas">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Faixas de Alíquota</div>
+        <div class="page-subtitle">Configure os limites e alíquotas base por categoria (Art. 178 CTM)</div>
+      </div>
+      <div class="flex-gap-8">
+        <label class="form-label" style="margin:0;white-space:nowrap">Exercício base:</label>
+        <input type="number" value="2027" style="width:90px">
+        <button class="btn btn-secondary btn-sm">Projetar anos seguintes →</button>
+        <button class="btn btn-primary btn-sm">+ Adicionar faixa</button>
+      </div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="row">
+      <!-- sidebar interna -->
+      <div style="flex:0 0 160px">
+        <div class="section-title">Categoria</div>
+        <div class="inner-nav">
+          <div class="inner-nav-item active">Residencial</div>
+          <div class="inner-nav-item">Não residencial</div>
+          <div class="inner-nav-item">Territorial</div>
+          <div class="inner-nav-item">Em construção</div>
+        </div>
+        <div style="margin-top:16px;padding:10px 12px;background:var(--blue-light);border-radius:var(--radius);font-size:11px;color:var(--blue-txt)">
+          <div class="fw-500 mb-4">Art. 178, inc. I</div>
+          Imóveis edificados de uso residencial
+        </div>
+      </div>
+
+      <!-- tabela -->
+      <div class="col-6">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Tabela de enquadramento — Residencial (2027)</div>
+            <div class="flex-gap-8">
+              <span class="badge badge-blue">6 faixas</span>
+              <button class="btn btn-secondary btn-sm">Salvar tudo</button>
+            </div>
+          </div>
+          <div class="card-body-flush table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Limite inferior (R$)</th>
+                  <th>Limite superior (R$)</th>
+                  <th class="right">Alíquota (%)</th>
+                  <th>Origem</th>
+                  <th>Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="muted">1</td>
+                  <td><input type="text" value="0,00" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td><input type="text" value="106.500,00" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td class="right"><input type="text" value="0,15" style="width:60px;padding:4px 8px;font-size:12px;text-align:right;font-family:var(--font-mono)"></td>
+                  <td><span class="badge badge-blue">projetado</span></td>
+                  <td><a class="action-link" style="color:var(--red-txt)">remover</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">2</td>
+                  <td><input type="text" value="106.500,01" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td><input type="text" value="213.000,00" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td class="right"><input type="text" value="0,20" style="width:60px;padding:4px 8px;font-size:12px;text-align:right;font-family:var(--font-mono)"></td>
+                  <td><span class="badge badge-blue">projetado</span></td>
+                  <td><a class="action-link" style="color:var(--red-txt)">remover</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">3</td>
+                  <td><input type="text" value="213.000,01" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td><input type="text" value="319.500,00" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td class="right"><input type="text" value="0,29" style="width:60px;padding:4px 8px;font-size:12px;text-align:right;font-family:var(--font-mono)"></td>
+                  <td><span class="badge badge-blue">projetado</span></td>
+                  <td><a class="action-link" style="color:var(--red-txt)">remover</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">4</td>
+                  <td><input type="text" value="319.500,01" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td><input type="text" value="532.500,00" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td class="right"><input type="text" value="0,40" style="width:60px;padding:4px 8px;font-size:12px;text-align:right;font-family:var(--font-mono)"></td>
+                  <td><span class="badge badge-blue">projetado</span></td>
+                  <td><a class="action-link" style="color:var(--red-txt)">remover</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">5</td>
+                  <td><input type="text" value="532.500,01" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td><input type="text" value="1.065.000,00" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td class="right"><input type="text" value="0,50" style="width:60px;padding:4px 8px;font-size:12px;text-align:right;font-family:var(--font-mono)"></td>
+                  <td><span class="badge badge-blue">projetado</span></td>
+                  <td><a class="action-link" style="color:var(--red-txt)">remover</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">6</td>
+                  <td><input type="text" value="1.065.000,01" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono)"></td>
+                  <td><input type="text" value="—" style="width:130px;padding:4px 8px;font-size:12px;font-family:var(--font-mono);color:var(--txt-4)"></td>
+                  <td class="right"><input type="text" value="0,55" style="width:60px;padding:4px 8px;font-size:12px;text-align:right;font-family:var(--font-mono)"></td>
+                  <td><span class="badge badge-blue">projetado</span></td>
+                  <td><a class="action-link" style="color:var(--red-txt)">remover</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- projeção -->
+        <div class="card mt-16">
+          <div class="card-header">
+            <div class="card-title">Projeção dos limites</div>
+            <div class="flex-gap-8">
+              <span class="text-sm text-muted">Indexador:</span>
+              <span class="badge badge-blue">SELIC (9,00%/a)</span>
+              <span class="badge badge-gray">IPCA (4,00%/a)</span>
+            </div>
+          </div>
+          <div class="card-body-flush table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Faixa</th>
+                  <th class="right">Alíquota</th>
+                  <th class="right">Base 2027</th>
+                  <th class="right">2028</th>
+                  <th class="right">2029</th>
+                  <th class="right">2030</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td class="mono">Faixa 1</td><td class="right mono">0,15%</td><td class="right mono">106.500</td><td class="right mono">116.085</td><td class="right mono">126.533</td><td class="right mono">137.921</td></tr>
+                <tr><td class="mono">Faixa 2</td><td class="right mono">0,20%</td><td class="right mono">213.000</td><td class="right mono">232.170</td><td class="right mono">253.065</td><td class="right mono">275.841</td></tr>
+                <tr><td class="mono">Faixa 3</td><td class="right mono">0,29%</td><td class="right mono">319.500</td><td class="right mono">348.255</td><td class="right mono">379.598</td><td class="right mono">413.762</td></tr>
+                <tr><td class="mono">Faixa 4</td><td class="right mono">0,40%</td><td class="right mono">532.500</td><td class="right mono">580.425</td><td class="right mono">632.663</td><td class="right mono">689.603</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: SIMULAÇÕES
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-simulacoes">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Simulações</div>
+        <div class="page-subtitle">Configure e execute projeções de lançamento futuro do IPTU</div>
+      </div>
+      <button class="btn btn-primary" onclick="showPage('nova-simulacao')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Nova simulação
+      </button>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="card">
+      <div class="card-header"><div class="card-title">Simulações cadastradas</div></div>
+      <div class="card-body-flush table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Cenário</th>
+              <th class="right">Base</th>
+              <th class="right">Até</th>
+              <th class="right">Imóveis</th>
+              <th>Status</th>
+              <th>Criado em</th>
+              <th>Ações</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="fw-500">Simulação 2027–2035 · SELIC</td>
+              <td><span class="badge badge-blue">SELIC</span></td>
+              <td class="right">2026</td>
+              <td class="right">2035</td>
+              <td class="right">147.920</td>
+              <td><span class="badge badge-green"><span class="status-dot green"></span>Concluído</span></td>
+              <td class="muted">03/05/2026</td>
+              <td><a class="action-link">ver</a> · <a class="action-link">exportar</a></td>
+            </tr>
+            <tr>
+              <td class="fw-500">Simulação 2027–2035 · IPCA</td>
+              <td><span class="badge badge-gray">IPCA</span></td>
+              <td class="right">2026</td>
+              <td class="right">2035</td>
+              <td class="right">147.920</td>
+              <td><span class="badge badge-green"><span class="status-dot green"></span>Concluído</span></td>
+              <td class="muted">03/05/2026</td>
+              <td><a class="action-link">ver</a> · <a class="action-link">exportar</a></td>
+            </tr>
+            <tr>
+              <td class="fw-500">Projeção conservadora 2027–2030</td>
+              <td><span class="badge badge-blue">SELIC</span></td>
+              <td class="right">2026</td>
+              <td class="right">2030</td>
+              <td class="right">147.920</td>
+              <td><span class="badge badge-amber"><span class="status-dot blue"></span>Processando</span></td>
+              <td class="muted">03/05/2026</td>
+              <td><a class="action-link">ver</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: NOVA SIMULAÇÃO
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-nova-simulacao">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Nova simulação</div>
+        <div class="page-subtitle">Configure os parâmetros e dispare o motor de cálculo assíncrono</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="showPage('simulacoes')">← Voltar</button>
+    </div>
+  </div>
+  <div class="page-content">
+    <div style="max-width:680px">
+
+      <!-- Identificação -->
+      <div class="card mb-16">
+        <div class="card-header">
+          <div class="card-title">Identificação</div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label class="form-label">Nome da simulação</label>
+            <input type="text" placeholder="Ex: Cenário 2027–2035 · SELIC c/ Cap">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label">Descrição <span class="text-muted fw-500">(opcional)</span></label>
+            <textarea placeholder="Descreva o objetivo desta simulação..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Parâmetros -->
+      <div class="card mb-16">
+        <div class="card-header">
+          <div class="card-title">Variáveis de tempo e projeção</div>
+        </div>
+        <div class="card-body">
+          <div class="grid-2 mb-16">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Exercício base (origem dos dados)</label>
+              <select><option>2026</option><option>2025</option><option>2024</option></select>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Exercício destino (alvo da projeção)</label>
+              <select><option>2035</option><option>2034</option><option>2033</option><option>2030</option></select>
+            </div>
+          </div>
+          <div class="grid-2 mb-0">
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Ano-base das faixas</label>
+              <select><option>2027</option><option>2026</option></select>
+              <div class="form-hint">Faixas a partir deste ano serão projetadas</div>
+            </div>
+            <div class="form-group" style="margin-bottom:0">
+              <label class="form-label">Cenário de reajuste das faixas</label>
+              <div class="radio-group">
+                <div class="radio-option selected">
+                  <input type="radio" name="cenario" checked>
+                  <div class="radio-option-label">SELIC</div>
+                  <div class="radio-option-hint">Padrão legal (Art. 381)</div>
+                </div>
+                <div class="radio-option">
+                  <input type="radio" name="cenario">
+                  <div class="radio-option-label">IPCA</div>
+                  <div class="radio-option-hint">Cenário alternativo</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Regras de negócio -->
+      <div class="card mb-16">
+        <div class="card-header"><div class="card-title">Regras de negócio</div></div>
+        <div class="card-body">
+          <div class="toggle-wrap">
+            <input type="checkbox" id="cap" checked>
+            <div>
+              <div class="toggle-label">Aplicar cap de transição (+5% acima da inflação)</div>
+              <div class="toggle-hint">Limita o acréscimo abusivo do imposto em relação ao ano anterior, conforme Art. 168 §6º CTM. Não se aplica a imóveis novos ou com alterações cadastrais.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div class="card mb-24" style="border-color:var(--blue-mid);background:var(--blue-light)">
+        <div class="card-header" style="border-color:var(--blue-mid)">
+          <div class="card-title" style="color:var(--blue-txt)">Resumo da simulação</div>
+        </div>
+        <div class="card-body">
+          <div class="grid-2">
+            <div><span class="text-sm text-muted">Exercícios a simular</span><br><span class="fw-500">2027 → 2035 (9 anos)</span></div>
+            <div><span class="text-sm text-muted">Imóveis na base</span><br><span class="fw-500 mono">147.920</span></div>
+            <div><span class="text-sm text-muted">Faixas cadastradas</span><br><span class="fw-500">24 faixas (4 categorias)</span></div>
+            <div><span class="text-sm text-muted">Estimativa de tempo</span><br><span class="fw-500">~8 minutos</span></div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg" style="width:100%">
+        <svg viewBox="0 0 24 24" width="16" height="16"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+        Iniciar processamento assíncrono (BullMQ)
+      </button>
+      <div class="text-xs text-muted mt-8" style="text-align:center">
+        Ao iniciar, o painel pode ser fechado sem interromper a execução — o motor roda em background.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: EXPORTAR
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-exportar">
+  <div class="page-header">
+    <div class="page-title">Exportar dados</div>
+    <div class="page-subtitle">Gere arquivos CSV, XLSX ou PDF com os lançamentos simulados</div>
+  </div>
+  <div class="page-content">
+    <div class="row">
+      <div style="flex:0 0 300px">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Configurar exportação</div></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Simulação</label>
+              <select>
+                <option>Simulação 2027–2035 · SELIC</option>
+                <option>Simulação 2027–2035 · IPCA</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Exercícios</label>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" checked style="width:auto"> 2027</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" checked style="width:auto"> 2028</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" checked style="width:auto"> 2029</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" style="width:auto"> 2030</label>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Formato</label>
+              <div class="radio-group" style="flex-direction:column;gap:4px">
+                <div class="radio-option selected" style="padding:8px 12px">
+                  <div class="radio-option-label">CSV</div>
+                </div>
+                <div class="radio-option" style="padding:8px 12px">
+                  <div class="radio-option-label">XLSX</div>
+                </div>
+                <div class="radio-option" style="padding:8px 12px">
+                  <div class="radio-option-label">PDF (relatório)</div>
+                </div>
+              </div>
+            </div>
+            <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;margin-bottom:16px;font-size:12px;color:var(--txt-3)">
+              Serão exportados: <strong style="color:var(--txt-1)">437.760 registros</strong> · 27 colunas · ~18 MB
+            </div>
+            <button class="btn btn-primary" style="width:100%">
+              <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Gerar e baixar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Histórico de exportações</div></div>
+          <div class="card-body-flush table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Simulação</th>
+                  <th>Formato</th>
+                  <th class="right">Tamanho</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="muted">03/05 15:42</td>
+                  <td>2027–2035 · SELIC</td>
+                  <td><span class="badge badge-gray">CSV</span></td>
+                  <td class="right mono">22,4 MB</td>
+                  <td><a class="action-link">baixar</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">03/05 14:18</td>
+                  <td>2027–2035 · IPCA</td>
+                  <td><span class="badge badge-gray">XLSX</span></td>
+                  <td class="right mono">8,1 MB</td>
+                  <td><a class="action-link">baixar</a></td>
+                </tr>
+                <tr>
+                  <td class="muted">02/05 10:30</td>
+                  <td>2027–2035 · SELIC</td>
+                  <td><span class="badge badge-gray">PDF</span></td>
+                  <td class="right mono">1,2 MB</td>
+                  <td><a class="action-link">baixar</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: CONFIGURAÇÕES BASE
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-config-base">
+  <div class="page-header">
+    <div class="page-title">Configurações Base do IPTU</div>
+    <div class="page-subtitle">Valores de referência históricos para cálculo do IPTU Social e Imposto Mínimo</div>
+  </div>
+  <div class="page-content">
+    <div class="grid-2">
+
+      <!-- IPTU Social -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">IPTU Social (Base)</div>
+            <div class="card-subtitle">Anexo X, item 14 — LC 362/2022</div>
+          </div>
+          <span class="badge badge-blue">Art. 178 §4º</span>
+        </div>
+        <div class="card-body">
+          <div style="background:var(--blue-light);border:1px solid var(--blue-mid);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--blue-txt);line-height:1.6">
+            Limite base cadastrado aqui é atualizado automaticamente pela SELIC acumulada a cada exercício.<br>
+            <strong>Limite(ano) = Valor Base × ∏ SELIC(2023 até ano-1)</strong>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ano de referência</label>
+            <input type="number" value="2022">
+            <div class="form-hint">Ano em que o valor base foi definido pela LC 362/2022</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor base (R$)</label>
+            <input type="text" value="140.000,00" style="font-family:var(--font-mono)">
+            <div class="form-hint">R$ 140.000,00 conforme Anexo X, item 14 do CTM</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Observação</label>
+            <textarea>Limite venal para isenção social — pessoa física, imóvel único residencial</textarea>
+          </div>
+
+          <!-- preview atualizado -->
+          <div class="section-title mt-16 mb-8">Valores atualizados pela SELIC</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Exercício</th>
+                  <th class="right">SELIC do ano</th>
+                  <th class="right">Limite vigente</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>2022 <span class="badge badge-gray" style="font-size:10px">base</span></td><td class="right mono">—</td><td class="right mono fw-500">R$ 140.000,00</td></tr>
+                <tr><td>2023</td><td class="right mono">11,75%</td><td class="right mono">R$ 156.450,00</td></tr>
+                <tr><td>2024</td><td class="right mono">10,50%</td><td class="right mono">R$ 172.877,25</td></tr>
+                <tr><td>2025</td><td class="right mono">13,25%</td><td class="right mono">R$ 195.883,04</td></tr>
+                <tr><td>2026</td><td class="right mono">14,75%</td><td class="right mono">R$ 224.624,99</td></tr>
+                <tr style="background:var(--blue-light)"><td><strong>2027</strong> <span class="badge badge-blue" style="font-size:10px">simulado</span></td><td class="right mono">14,75%</td><td class="right mono fw-500">R$ 257.656,75</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-primary mt-16">Salvar base social</button>
+        </div>
+      </div>
+
+      <!-- Imposto Mínimo -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Imposto Mínimo (Base)</div>
+            <div class="card-subtitle">Art. 179 do CTM</div>
+          </div>
+          <span class="badge badge-amber">Art. 179</span>
+        </div>
+        <div class="card-body">
+          <div style="background:var(--amber-light);border:1px solid var(--amber-mid);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--amber-txt);line-height:1.6">
+            Em nenhuma hipótese o valor do IPTU será inferior ao valor mínimo.<br>
+            <strong>Mínimo(ano) = Valor Base × ∏ SELIC(2023 até ano-1)</strong>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Ano de referência</label>
+            <input type="number" value="2022">
+            <div class="form-hint">Ano em que o valor base foi definido na lei</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Valor base (R$)</label>
+            <input type="text" value="100,00" style="font-family:var(--font-mono)">
+            <div class="form-hint">R$ 100,00 conforme Art. 179 do CTM</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Observação</label>
+            <textarea>Valor mínimo do lançamento do IPTU (Art. 179 CTM)</textarea>
+          </div>
+
+          <!-- preview atualizado -->
+          <div class="section-title mt-16 mb-8">Valores atualizados pela SELIC</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Exercício</th>
+                  <th class="right">SELIC do ano</th>
+                  <th class="right">Mínimo vigente</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td>2022 <span class="badge badge-gray" style="font-size:10px">base</span></td><td class="right mono">—</td><td class="right mono fw-500">R$ 100,00</td></tr>
+                <tr><td>2023</td><td class="right mono">11,75%</td><td class="right mono">R$ 111,75</td></tr>
+                <tr><td>2024</td><td class="right mono">10,50%</td><td class="right mono">R$ 123,49</td></tr>
+                <tr><td>2025</td><td class="right mono">13,25%</td><td class="right mono">R$ 139,85</td></tr>
+                <tr><td>2026</td><td class="right mono">14,75%</td><td class="right mono">R$ 160,46</td></tr>
+                <tr style="background:var(--amber-light)"><td><strong>2027</strong> <span class="badge badge-amber" style="font-size:10px">simulado</span></td><td class="right mono">14,75%</td><td class="right mono fw-500">R$ 184,03</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <button class="btn btn-primary mt-16">Salvar base mínimo</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────────────────────────
+     PAGE: AUDITORIA
+────────────────────────────────────────────────────── -->
+<div class="page" id="page-auditoria">
+  <div class="page-header">
+    <div class="page-header-row">
+      <div>
+        <div class="page-title">Auditoria Individual</div>
+        <div class="page-subtitle">Consulte o histórico real e simulado de um imóvel específico por inscrição cadastral</div>
+      </div>
+    </div>
+  </div>
+  <div class="page-content">
+    <div class="row">
+
+      <!-- filtros -->
+      <div style="flex:0 0 280px">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Busca</div></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Inscrição cadastral</label>
+              <input type="text" id="audit-inscricao" placeholder="Ex: 10.806.103.735.737" style="font-family:var(--font-mono)">
+              <div class="form-hint">14 dígitos — chave do imóvel no cadastro imobiliário</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Simulações para comparar</label>
+              <div style="display:flex;flex-direction:column;gap:4px">
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" checked style="width:auto"> 2027–2035 · SELIC</label>
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px"><input type="checkbox" style="width:auto"> 2027–2035 · IPCA</label>
+              </div>
+              <div class="form-hint mt-4">Selecione até 2 simulações para comparar</div>
+            </div>
+            <button class="btn btn-primary" style="width:100%" onclick="renderAuditoria()">
+              <svg viewBox="0 0 24 24" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Buscar imóvel
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- resultado -->
+      <div class="col-6" id="audit-resultado">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:300px;color:var(--txt-4)">
+          <svg viewBox="0 0 24 24" width="36" height="36" style="stroke:currentColor;fill:none;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round;margin-bottom:12px"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <div style="font-size:13px;font-weight:500;color:var(--txt-3)">Informe a inscrição cadastral</div>
+          <div class="text-sm text-muted mt-4">Os dados reais e simulados aparecerão aqui</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+function renderAuditoria() {
+  const inscricao = document.getElementById('audit-inscricao').value || '10.806.103.735.737';
+  const resultado = document.getElementById('audit-resultado');
+  resultado.innerHTML = `
+    <!-- cabeçalho do imóvel -->
+    <div class="card mb-16">
+      <div class="card-header">
+        <div>
+          <div class="card-title" style="font-family:var(--font-mono)">${inscricao}</div>
+          <div class="card-subtitle">EDIFICIO RESIDENCIAL VILA RICA · Bairro: Setor Oeste</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <span class="badge badge-blue">Predial</span>
+          <span class="badge badge-gray">Residencial</span>
+          <span class="badge badge-green">Apartamento</span>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="grid-2" style="gap:10px">
+          <div class="kpi-card" style="padding:10px 14px"><div class="kpi-label">Área terreno</div><div class="kpi-value" style="font-size:16px">10.063,29 m²</div></div>
+          <div class="kpi-card" style="padding:10px 14px"><div class="kpi-label">Área edificada</div><div class="kpi-value" style="font-size:16px">14,00 m²</div></div>
+          <div class="kpi-card" style="padding:10px 14px"><div class="kpi-label">Contribuinte</div><div class="kpi-value" style="font-size:13px;font-weight:500">EDIFICIO RESIDENCIAL VILA RICA</div></div>
+          <div class="kpi-card" style="padding:10px 14px"><div class="kpi-label">CPF/CNPJ</div><div class="kpi-value" style="font-size:14px;font-family:var(--font-mono)">37.837.630/0001-25</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- tabela histórico + simulação -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Histórico real + projeção simulada</div>
+        <div style="display:flex;gap:6px">
+          <span class="badge badge-gray">Real 2022–2026</span>
+          <span class="badge badge-blue">Simulado 2027+</span>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Exercício</th>
+              <th class="right">Valor venal</th>
+              <th class="right">Faixa</th>
+              <th class="right">Alíquota</th>
+              <th class="right">Imposto</th>
+              <th>Tipo lançamento</th>
+              <th>Migração</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>2022</td><td class="right mono">R$ 3.842,50</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 57,64</td><td><span class="badge badge-amber">Mínimo</span></td><td class="muted">—</td></tr>
+            <tr><td>2023</td><td class="right mono">R$ 4.020,19</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 60,30</td><td><span class="badge badge-amber">Mínimo</span></td><td><span class="badge badge-igual">→ permaneceu</span></td></tr>
+            <tr><td>2024</td><td class="right mono">R$ 4.214,24</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 65,44</td><td><span class="badge badge-amber">Mínimo</span></td><td><span class="badge badge-igual">→ permaneceu</span></td></tr>
+            <tr><td>2025</td><td class="right mono">R$ 4.428,66</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 66,43</td><td><span class="badge badge-amber">Mínimo</span></td><td><span class="badge badge-igual">→ permaneceu</span></td></tr>
+            <tr><td>2026</td><td class="right mono">R$ 4.511,75</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 65,44</td><td><span class="badge badge-amber">Mínimo</span></td><td><span class="badge badge-igual">→ permaneceu</span></td></tr>
+            <tr style="background:var(--blue-light)"><td><strong>2027</strong></td><td class="right mono">R$ 4.713,17</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 184,03</td><td><span class="badge badge-amber">Mínimo</span></td><td><span class="badge badge-igual">→ permaneceu</span></td></tr>
+            <tr style="background:var(--blue-light)"><td><strong>2028</strong></td><td class="right mono">R$ 4.923,46</td><td class="right">RES-F1</td><td class="right mono">0,15%</td><td class="right mono fw-500">R$ 211,29</td><td><span class="badge badge-amber">Mínimo</span></td><td><span class="badge badge-igual">→ permaneceu</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="padding:10px 18px;border-top:1px solid var(--border);background:var(--surface-2)">
+        <div class="text-xs text-muted">
+          <strong>Imposto mínimo:</strong> o valor venal deste imóvel gera imposto inferior ao mínimo legal em todos os exercícios.
+          O imposto cobrado é o mínimo vigente de cada exercício, atualizado pela SELIC.
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const page = document.getElementById('page-' + name);
+  if (page) page.classList.add('active');
+  const navMap = {
+    'dashboard': 0, 'importacao': 1,
+    'parametros': 2, 'faixas': 3,
+    'simulacoes': 4, 'nova-simulacao': 4,
+    'exportar': 5, 'auditoria': 6,
+    'config-base': 7
+  };
+  const items = document.querySelectorAll('.nav-item');
+  if (navMap[name] !== undefined && items[navMap[name]]) {
+    items[navMap[name]].classList.add('active');
+  }
+}
+</script>
+</body>
+</html>
