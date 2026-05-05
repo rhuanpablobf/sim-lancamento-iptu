@@ -14,7 +14,7 @@ services:
       retries: 5
 
   backend_prod:
-    image: rhuanpablobf/iptu-backend:latest
+    image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
     container_name: iptu_backend_prod
     restart: always
     expose:
@@ -29,7 +29,7 @@ services:
       - redis_prod
 
   worker_prod:
-    image: rhuanpablobf/iptu-backend:latest
+    image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
     container_name: iptu_worker_prod
     restart: always
     command: celery -A app.celery_app worker --loglevel=info --concurrency=4
@@ -41,7 +41,7 @@ services:
       - redis_prod
 
   frontend_prod:
-    image: rhuanpablobf/iptu-frontend:latest
+    image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-frontend:latest
     container_name: iptu_frontend_prod
     restart: always
     expose:

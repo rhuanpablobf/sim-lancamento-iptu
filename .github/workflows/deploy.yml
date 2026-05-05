@@ -1,25 +1,32 @@
-name: Build e Push para Docker Hub
+name: Build e Push para GHCR (GitHub Container Registry)
 
 on:
   push:
     branches: [ "main" ]
 
 env:
-  # Optando pelo Node.js 24 conforme recomendado pelo GitHub
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}-backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}-frontend
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout do código
         uses: actions/checkout@v4
 
-      - name: Login no Docker Hub
+      - name: Login no GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Build do Backend
       - name: Build e Push Backend
@@ -27,7 +34,8 @@ jobs:
         with:
           context: ./backend
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/iptu-backend:latest
+          tags: |
+            ghcr.io/${{ github.repository }}-backend:latest
 
       # Build do Frontend
       - name: Build e Push Frontend
@@ -35,6 +43,7 @@ jobs:
         with:
           context: ./frontend
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/iptu-frontend:latest
+          tags: |
+            ghcr.io/${{ github.repository }}-frontend:latest
           build-args: |
             NEXT_PUBLIC_API_URL=https://api-laniptu.geredados.com.br
