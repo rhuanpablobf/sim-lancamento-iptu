@@ -4,6 +4,10 @@ on:
   push:
     branches: [ "main" ]
 
+env:
+  # Optando pelo Node.js 24 conforme recomendado pelo GitHub
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
