@@ -100,12 +100,14 @@ export default function DashboardPage() {
     ? `/api/importacao/dashboard?exercicio=${anoSelecionado || ""}` 
     : `/api/simulacoes/${contexto}/dashboard?exercicio=${anoSelecionado}`;
 
-  const { data } = useSWR(
+  const { data, error, isLoading } = useSWR(
     (contexto === "base" || (contexto !== "base" && anoSelecionado)) ? urlDashboard : null,
     fetcher
   );
 
   const d = data?.dados;
+  const kpis = d?.kpis_atuais;
+  const ant = d?.kpis_anteriores;
 
   const urlConsolidado = contexto === "base"
     ? "/api/importacao/dashboard/consolidado-faixas"

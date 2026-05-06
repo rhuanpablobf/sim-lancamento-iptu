@@ -4,11 +4,6 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   typescript: {
     ignoreBuildErrors: true,
-  },
-  experimental: {
-    turbo: {
-      rules: {}
-    }
   }
 };
 
