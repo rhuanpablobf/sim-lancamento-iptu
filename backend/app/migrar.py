@@ -91,6 +91,23 @@ def migrar():
                 except Exception as e:
                     print(f"Erro ao adicionar {col} em sim_lancamentos: {e}")
 
+        # Garantir que a tabela SIA_LANCIPTU_ASG exista (mesmo que vazia)
+        if "SIA_LANCIPTU_ASG" not in inspector.get_table_names():
+            print("Criando tabela SIA_LANCIPTU_ASG para evitar erros de leitura...")
+            conn.execute(text("""
+                CREATE TABLE "SIA_LANCIPTU_ASG" (
+                    "ISN_SIA_LANCIPTU_ASG" BIGSERIAL PRIMARY KEY,
+                    "CODG_EXERCICIO_LAN" SMALLINT,
+                    "TIPO_IMPOSTO_LAN" VARCHAR(1),
+                    "INFO_USO_LAN" VARCHAR(1),
+                    "VALR_VENAL_LAN" NUMERIC(15, 2),
+                    "VALR_IMPOSTO_LAN" NUMERIC(15, 2),
+                    "faixa_codigo" VARCHAR(20),
+                    "faixa_label" VARCHAR(100)
+                )
+            """))
+            conn.commit()
+
     print("Migração concluída.")
 
 if __name__ == "__main__":
