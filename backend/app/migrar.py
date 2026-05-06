@@ -108,6 +108,18 @@ def migrar():
             """))
             conn.commit()
 
+        # Garantir que a tabela auxiliar exista
+        if "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" not in inspector.get_table_names():
+            print("Criando tabela auxiliar SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN...")
+            conn.execute(text("""
+                CREATE TABLE "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" (
+                    "ISN_SIA_LANCIPTU_ASG" BIGINT PRIMARY KEY,
+                    "CODG_TIPO_EDIFICACAO_LAN" VARCHAR(2),
+                    "DESC_TIPO_EDIFICACAO_LAN" VARCHAR(100)
+                )
+            """))
+            conn.commit()
+
     print("Migração concluída.")
 
 if __name__ == "__main__":
