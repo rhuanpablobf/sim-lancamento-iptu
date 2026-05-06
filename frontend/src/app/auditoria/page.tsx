@@ -73,22 +73,29 @@ export default function AuditoriaPage() {
               <div className="card-body">
                 <div className="form-group mb-20">
                   <label className="form-label">Inscrição Imobiliária</label>
-                  <input type="text" placeholder="000.000.000.000" value={inscricao} onChange={e => setInscricao(e.target.value)} className="w-100" />
+                  <input type="text" placeholder="000.000.000.000" value={inscricao} onChange={e => setInscricao(e.target.value)} style={{ width: "100%" }} />
                   <div className="text-xs text-muted mt-8">Utilize apenas números ou formato padrão SEFIN</div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Estudos para Comparar</label>
-                  <div className="sim-list">
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "240px", overflowY: "auto", padding: "4px", border: "1px solid var(--border)", borderRadius: "6px" }}>
                     {simulacoes.map(s => (
-                      <label key={s.id} className={`sim-item ${simulacoesSelecionadas.includes(s.id) ? 'active' : ''}`}>
+                      <label 
+                        key={s.id} 
+                        style={{ 
+                          display: "flex", alignItems: "center", gap: "8px", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s", fontSize: "13px",
+                          background: simulacoesSelecionadas.includes(s.id) ? "var(--blue-light)" : "transparent",
+                          color: simulacoesSelecionadas.includes(s.id) ? "var(--blue-txt)" : "inherit"
+                        }}
+                      >
                         <input type="checkbox" checked={simulacoesSelecionadas.includes(s.id)} onChange={() => setSimulacoesSelecionadas(prev => prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])} />
                         <span className="name">{s.nome}</span>
                       </label>
                     ))}
                   </div>
                 </div>
-                <button className="btn btn-primary w-100 mt-20" onClick={buscarAuditoria} disabled={buscando}>{buscando ? "Consultando..." : "Auditar Imóvel"}</button>
+                <button className="btn btn-primary" style={{ width: "100%", marginTop: "20px" }} onClick={buscarAuditoria} disabled={buscando}>{buscando ? "Consultando..." : "Auditar Imóvel"}</button>
               </div>
             </div>
 
@@ -96,10 +103,10 @@ export default function AuditoriaPage() {
               <div className="card" style={{ background: "var(--surface-2)" }}>
                 <div className="card-header"><div className="card-title">Legenda de Cálculo</div></div>
                 <div className="card-body">
-                  <div className="flex-gap-12 flex-column">
-                    <div className="text-xs flex-gap-8"><span className="badge badge-blue">IPTU Social</span> Enquadrado por valor venal/uso</div>
-                    <div className="text-xs flex-gap-8"><span className="badge badge-green">Isento</span> Isenção total conforme CTM</div>
-                    <div className="text-xs flex-gap-8"><span className="badge badge-amber">Mínimo</span> Limite de valor mínimo atingido</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                    <div className="text-xs" style={{ display: "flex", gap: "8px" }}><span className="badge badge-blue">IPTU Social</span> Enquadrado por valor venal/uso</div>
+                    <div className="text-xs" style={{ display: "flex", gap: "8px" }}><span className="badge badge-green">Isento</span> Isenção total conforme CTM</div>
+                    <div className="text-xs" style={{ display: "flex", gap: "8px" }}><span className="badge badge-amber">Mínimo</span> Limite de valor mínimo atingido</div>
                   </div>
                 </div>
               </div>
@@ -108,10 +115,10 @@ export default function AuditoriaPage() {
 
           <div style={{ flex: 1 }}>
             {resultados.length === 0 ? (
-              <div className="empty-state">
-                <div className="icon">🔍</div>
-                <div className="title">Aguardando Consulta</div>
-                <div className="desc">Insira uma inscrição e selecione os estudos ao lado para visualizar a evolução do imposto.</div>
+              <div style={{ height: "400px", display: "flex", flexDirection: "column", alignItems: "center", justifyCenter: "center", border: "2px dashed var(--border)", borderRadius: "var(--radius)", textAlign: "center", padding: "40px", display: "flex", justifyContent: "center" }}>
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
+                <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>Aguardando Consulta</div>
+                <div style={{ fontSize: "13px", color: "var(--text-muted)", maxWidth: "300px" }}>Insira uma inscrição e selecione os estudos ao lado para visualizar a evolução do imposto.</div>
               </div>
             ) : (
               <div className="card">
@@ -136,10 +143,10 @@ export default function AuditoriaPage() {
                         return (
                           <tr key={i}>
                             <td className="fw-500">{r.simulacao_nome}</td>
-                            <td className="fw-700 color-blue">{r.exercicio}</td>
+                            <td className="fw-700" style={{ color: "var(--blue-txt)" }}>{r.exercicio}</td>
                             <td className="right text-mono">{r.valr_venal_simulado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
                             <td className="right text-mono">{(r.aliquota * 100).toFixed(2)}%</td>
-                            <td className="right text-mono fw-700 color-green">{r.imposto_final.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
+                            <td className="right text-mono fw-700" style={{ color: "var(--green)" }}>{r.imposto_final.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</td>
                             <td className="center"><span className={`badge ${meta.classe}`}>{meta.label}</span></td>
                           </tr>
                         );
@@ -152,24 +159,6 @@ export default function AuditoriaPage() {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .w-100 { width: 100%; }
-        .flex-column { flex-direction: column; }
-        .color-blue { color: var(--blue-txt); }
-        .color-green { color: var(--green); }
-        
-        .sim-list { display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow-y: auto; padding: 4px; border: 1px solid var(--border); border-radius: 6px; }
-        .sim-item { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; cursor: pointer; transition: all 0.2s; font-size: 13px; }
-        .sim-item:hover { background: var(--bg); }
-        .sim-item.active { background: var(--blue-light); color: var(--blue-txt); }
-        .sim-item input { margin: 0; }
-        
-        .empty-state { height: 400px; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 2px dashed var(--border); border-radius: var(--radius); text-align: center; padding: 40px; }
-        .empty-state .icon { font-size: 48px; margin-bottom: 16px; }
-        .empty-state .title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
-        .empty-state .desc { font-size: 13px; color: var(--text-muted); max-width: 300px; }
-      `}</style>
     </div>
   );
 }

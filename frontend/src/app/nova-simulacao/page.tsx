@@ -133,7 +133,11 @@ export default function NovaSimulacaoPage() {
                       <div 
                         className={`radio-option ${cenario === 'SELIC' ? 'selected' : ''}`}
                         onClick={() => setCenario('SELIC')}
-                        style={{ flex: 1, cursor: "pointer", padding: "10px", border: "1px solid var(--border)", borderRadius: "8px" }}
+                        style={{ 
+                          flex: 1, cursor: "pointer", padding: "10px", border: "1px solid var(--border)", borderRadius: "8px",
+                          borderColor: cenario === 'SELIC' ? "var(--blue-txt)" : "var(--border)",
+                          background: cenario === 'SELIC' ? "white" : "transparent"
+                        }}
                       >
                         <div className="fw-600 text-sm">SELIC</div>
                         <div className="text-xs text-muted">Padrão legal (Art. 381)</div>
@@ -141,7 +145,11 @@ export default function NovaSimulacaoPage() {
                       <div 
                         className={`radio-option ${cenario === 'IPCA' ? 'selected' : ''}`}
                         onClick={() => setCenario('IPCA')}
-                        style={{ flex: 1, cursor: "pointer", padding: "10px", border: "1px solid var(--border)", borderRadius: "8px" }}
+                        style={{ 
+                          flex: 1, cursor: "pointer", padding: "10px", border: "1px solid var(--border)", borderRadius: "8px",
+                          borderColor: cenario === 'IPCA' ? "var(--blue-txt)" : "var(--border)",
+                          background: cenario === 'IPCA' ? "white" : "transparent"
+                        }}
                       >
                         <div className="fw-600 text-sm">IPCA</div>
                         <div className="text-xs text-muted">Cenário conservador</div>
@@ -172,16 +180,44 @@ export default function NovaSimulacaoPage() {
                 <div className="grid-2">
                   <div className="form-group mb-0">
                     <label className="form-label">Indexador IPTU Social</label>
-                    <div className="segmented-control">
-                      <button type="button" className={indexadorSocial === 'SELIC' ? 'active' : ''} onClick={() => setIndexadorSocial('SELIC')}>SELIC</button>
-                      <button type="button" className={indexadorSocial === 'IPCA' ? 'active' : ''} onClick={() => setIndexadorSocial('IPCA')}>IPCA</button>
+                    <div style={{ display: "flex", background: "var(--bg)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                      <button type="button" 
+                        style={{ flex: 1, border: "none", padding: "6px", fontSize: "12px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                          background: indexadorSocial === 'SELIC' ? "white" : "none",
+                          color: indexadorSocial === 'SELIC' ? "var(--text)" : "var(--text-muted)",
+                          boxShadow: indexadorSocial === 'SELIC' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                        }}
+                        onClick={() => setIndexadorSocial('SELIC')}
+                      >SELIC</button>
+                      <button type="button"
+                        style={{ flex: 1, border: "none", padding: "6px", fontSize: "12px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                          background: indexadorSocial === 'IPCA' ? "white" : "none",
+                          color: indexadorSocial === 'IPCA' ? "var(--text)" : "var(--text-muted)",
+                          boxShadow: indexadorSocial === 'IPCA' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                        }}
+                        onClick={() => setIndexadorSocial('IPCA')}
+                      >IPCA</button>
                     </div>
                   </div>
                   <div className="form-group mb-0">
                     <label className="form-label">Indexador Imposto Mínimo</label>
-                    <div className="segmented-control">
-                      <button type="button" className={indexadorMinimo === 'SELIC' ? 'active' : ''} onClick={() => setIndexadorMinimo('SELIC')}>SELIC</button>
-                      <button type="button" className={indexadorMinimo === 'IPCA' ? 'active' : ''} onClick={() => setIndexadorMinimo('IPCA')}>IPCA</button>
+                    <div style={{ display: "flex", background: "var(--bg)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                      <button type="button"
+                        style={{ flex: 1, border: "none", padding: "6px", fontSize: "12px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                          background: indexadorMinimo === 'SELIC' ? "white" : "none",
+                          color: indexadorMinimo === 'SELIC' ? "var(--text)" : "var(--text-muted)",
+                          boxShadow: indexadorMinimo === 'SELIC' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                        }}
+                        onClick={() => setIndexadorMinimo('SELIC')}
+                      >SELIC</button>
+                      <button type="button"
+                        style={{ flex: 1, border: "none", padding: "6px", fontSize: "12px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                          background: indexadorMinimo === 'IPCA' ? "white" : "none",
+                          color: indexadorMinimo === 'IPCA' ? "var(--text)" : "var(--text-muted)",
+                          boxShadow: indexadorMinimo === 'IPCA' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                        }}
+                        onClick={() => setIndexadorMinimo('IPCA')}
+                      >IPCA</button>
                     </div>
                   </div>
                 </div>
@@ -202,13 +238,13 @@ export default function NovaSimulacaoPage() {
                         {anos.base + 1} a {anos.destino} ({anos.destino - anos.base} {anos.destino - anos.base === 1 ? 'ano' : 'anos'})
                       </span>
                     ) : (
-                      <span className="fw-500 text-error">Exercício destino deve ser posterior a {anos.base}</span>
+                      <span className="fw-500" style={{ color: "var(--red)" }}>Exercício destino deve ser posterior a {anos.base}</span>
                     )}
                   </div>
                   <div>
                     <span className="text-xs text-muted uppercase fw-600">Volume (Base {anos.base})</span><br />
                     <span className="fw-500">{contagemAtivos.toLocaleString('pt-BR')} ativos</span>
-                    <span className="text-xs text-muted ml-8">de {contagemTotal.toLocaleString('pt-BR')} total</span>
+                    <span className="text-xs text-muted" style={{ marginLeft: "8px" }}>de {contagemTotal.toLocaleString('pt-BR')} total</span>
                   </div>
                 </div>
               </div>
@@ -216,10 +252,10 @@ export default function NovaSimulacaoPage() {
 
             <button type="submit" className="btn btn-primary btn-lg" style={{ width: "100%" }} disabled={executando}>
               {executando ? (
-                <><span className="spinner"></span> Processando...</>
+                <>Processando...</>
               ) : (
                 <>
-                  <svg viewBox="0 0 24 24" width="16" height="16" style={{ marginRight: "8px" }}>
+                  <svg viewBox="0 0 24 24" width="16" height="16" style={{ marginRight: "8px", verticalAlign: "middle" }}>
                     <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2"/>
                     <polygon points="10 8 16 12 10 16 10 8" fill="currentColor"/>
                   </svg>
@@ -236,51 +272,6 @@ export default function NovaSimulacaoPage() {
           </form>
         </div>
       </div>
-
-      <style jsx>{`
-        .radio-option.selected {
-          border-color: var(--blue-txt) !important;
-          background: white;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-        .segmented-control {
-          display: flex;
-          background: var(--bg);
-          padding: 4px;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-        }
-        .segmented-control button {
-          flex: 1;
-          border: none;
-          background: none;
-          padding: 6px;
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--text-muted);
-          cursor: pointer;
-          border-radius: 6px;
-          transition: all 0.2s;
-        }
-        .segmented-control button.active {
-          background: white;
-          color: var(--text);
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .spinner {
-          display: inline-block;
-          width: 14px;
-          height: 14px;
-          border: 2px solid rgba(255,255,255,0.3);
-          border-radius: 50%;
-          border-top-color: #fff;
-          animation: spin 1s ease-in-out infinite;
-          margin-right: 8px;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }

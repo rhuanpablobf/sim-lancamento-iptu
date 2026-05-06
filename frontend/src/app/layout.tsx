@@ -24,8 +24,6 @@ export const metadata: Metadata = {
   description: "Sistema de Lançamento IPTU · Gabinete SEFIN",
 };
 
-import StyledJsxRegistry from "@/lib/registry";
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -38,12 +36,10 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-ibm-plex-sans, 'IBM Plex Sans', sans-serif)" }}
         suppressHydrationWarning
       >
-        <StyledJsxRegistry>
-          <Sidebar />
-          <main className="main">
-            {children}
-          </main>
-        </StyledJsxRegistry>
+        <Sidebar />
+        <main className="main">
+          {children}
+        </main>
       </body>
     </html>
   );

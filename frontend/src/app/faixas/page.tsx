@@ -34,7 +34,7 @@ export default function FaixasPage() {
     aliquota: 0,
   });
 
-  const { data, error, isLoading, mutate } = useSWR<RespostaFaixas>(
+  const { data, isLoading, mutate } = useSWR<RespostaFaixas>(
     `/api/faixas?exercicio=${exercicio}&categoria=${categoriaSelecionada}`,
     fetcher
   );
@@ -223,7 +223,15 @@ export default function FaixasPage() {
       </div>
 
       {exibirModal && (
-        <div className="modal-overlay" onClick={() => setExibirModal(false)}>
+        <div 
+          style={{ 
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(17, 24, 39, 0.4)", display: "flex",
+            alignItems: "center", justifyContent: "center", zIndex: 1000,
+            backdropFilter: "blur(4px)"
+          }} 
+          onClick={() => setExibirModal(false)}
+        >
           <div className="card" style={{ width: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
             <div className="card-header">
               <div className="card-title">{faixaEditandoId ? "Editar Faixa" : "Nova Faixa"}</div>
@@ -273,19 +281,6 @@ export default function FaixasPage() {
           </div>
         </div>
       )}
-
-      <style jsx>{`
-        .modal-overlay {
-          position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(17, 24, 39, 0.4);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          z-index: 1000;
-          backdrop-filter: blur(4px);
-        }
-      `}</style>
     </div>
   );
 }
