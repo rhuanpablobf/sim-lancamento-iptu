@@ -1,60 +1,71 @@
 version: '3.8'
 
 services:
-  redis_prod:
-    image: redis:7-alpine
-    container_name: iptu_redis_prod
+  db:
+    image: postgres:15-alpine
+    container_name: iptu_postgres
     restart: always
-    networks:
-      - net
+    environment:
+      POSTGRES_USER: ${DB_USER:-iptu_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-iptu_password}
+      POSTGRES_DB: ${DB_NAME:-lancamento-iptu}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: iptu_redis
+    restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  backend_prod:
+  backend:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
-    container_name: iptu_backend_prod
+    container_name: iptu_backend
     restart: always
-    expose:
-      - "8000"
-    ports:
-      - "8005:8000"
-    env_file:
-      - .env.prod
-    networks:
-      - net
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis_prod
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  worker_prod:
+  worker:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
-    container_name: iptu_worker_prod
+    container_name: iptu_worker
     restart: always
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=4
-    env_file:
-      - .env.prod
-    networks:
-      - net
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
-      - redis_prod
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
-  frontend_prod:
+  frontend:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-frontend:latest
-    container_name: iptu_frontend_prod
+    container_name: iptu_frontend
     restart: always
-    expose:
-      - "3000"
     ports:
-      - "3005:3000"
-    env_file:
-      - .env.prod
-    networks:
-      - net
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=https://api-laniptu.geredados.com.br
     depends_on:
-      - backend_prod
+      - backend
 
-networks:
-  net:
-    external: true
+volumes:
+  postgres_data:

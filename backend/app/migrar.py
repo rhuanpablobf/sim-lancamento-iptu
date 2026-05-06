@@ -91,34 +91,83 @@ def migrar():
                 except Exception as e:
                     print(f"Erro ao adicionar {col} em sim_lancamentos: {e}")
 
-        # Garantir que a tabela SIA_LANCIPTU_ASG exista (mesmo que vazia)
-        if "SIA_LANCIPTU_ASG" not in inspector.get_table_names():
-            print("Criando tabela SIA_LANCIPTU_ASG para evitar erros de leitura...")
+        # Garantir que a tabela SIA_LANCIPTU_ASG exista com o schema COMPLETO
+        tabelas_atuais = inspector.get_table_names()
+        
+        # Se a tabela existe mas está incompleta (menos de 20 colunas, por exemplo), vamos recriar
+        recriar_principal = False
+        if "SIA_LANCIPTU_ASG" in tabelas_atuais:
+            cols = [c["name"] for c in inspector.get_columns("SIA_LANCIPTU_ASG")]
+            if len(cols) < 15: # Está na versão simplificada
+                recriar_principal = True
+        else:
+            recriar_principal = True
+
+        if recriar_principal:
+            print("Criando/Atualizando tabela SIA_LANCIPTU_ASG com schema completo...")
+            if "SIA_LANCIPTU_ASG" in tabelas_atuais:
+                conn.execute(text('DROP TABLE "SIA_LANCIPTU_ASG" CASCADE'))
+            
             conn.execute(text("""
                 CREATE TABLE "SIA_LANCIPTU_ASG" (
-                    "ISN_SIA_LANCIPTU_ASG" BIGSERIAL PRIMARY KEY,
+                    "ISN_SIA_LANCIPTU_ASG" BIGINT PRIMARY KEY,
+                    "CODG_INSCRICAO_LAN" NUMERIC(14,0),
                     "CODG_EXERCICIO_LAN" SMALLINT,
-                    "TIPO_IMPOSTO_LAN" VARCHAR(1),
-                    "INFO_USO_LAN" VARCHAR(1),
-                    "VALR_VENAL_LAN" NUMERIC(15, 2),
-                    "VALR_IMPOSTO_LAN" NUMERIC(15, 2),
-                    "faixa_codigo" VARCHAR(20),
-                    "faixa_label" VARCHAR(100)
+                    "NUMR_SEQUENCIA_LAN" SMALLINT,
+                    "INFO_STATUS_LAN" SMALLINT,
+                    "TIPO_IMPOSTO_LAN" SMALLINT,
+                    "TIPO_LANCAMENTO_LAN" SMALLINT,
+                    "INFO_POSICAO_FISCAL_LAN" SMALLINT,
+                    "INFO_USO_LAN" SMALLINT,
+                    "INFO_OCUPACAO_LAN" SMALLINT,
+                    "NUMR_CIM_CONTRIBUINTE_LAN" INTEGER,
+                    "NOME_CONTRIBUINTE_LAN" VARCHAR(70),
+                    "INFO_CPF_CGC_LAN" VARCHAR(14),
+                    "NOME_LOGRAD_IMOVEL_LAN" VARCHAR(25),
+                    "NUMR_IMOVEL_LAN" VARCHAR(7),
+                    "INFO_COMPLEM_IMOVEL_LAN" VARCHAR(15),
+                    "CODG_BAIRRO_IMOVEL_LAN" SMALLINT,
+                    "VALR_VENAL_LAN" NUMERIC(15,2),
+                    "VALR_ALIQUOTA_LAN" NUMERIC(7,5),
+                    "VALR_IMPOSTO_LAN" NUMERIC(13,2),
+                    "VALR_TOTAL_LAN" NUMERIC(13,2),
+                    "QTDE_AREA_TERRENO_LAN" NUMERIC(10,2),
+                    "QTDE_AREA_EDIFICADA_LAN" NUMERIC(9,2),
+                    "CODG_EDIFICIO_LAN" INTEGER,
+                    "NUMR_SUBLOTE_PRINC_LAN" SMALLINT,
+                    "CODG_INSCR_ENGLOBADO_LAN" NUMERIC(14,0),
+                    "CODG_EXERC_ENGLOBADO_LAN" SMALLINT,
+                    "faixa_codigo" VARCHAR(10),
+                    "faixa_label" VARCHAR(60),
+                    "faixa_ordem" SMALLINT
                 )
             """))
             conn.commit()
 
-        # Garantir que a tabela auxiliar exista
-        if "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" not in inspector.get_table_names():
-            print("Criando tabela auxiliar SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN...")
+        # Garantir que a tabela auxiliar exista com schema completo
+        recriar_auxiliar = False
+        if "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" in tabelas_atuais:
+            cols_aux = [c["name"] for c in inspector.get_columns("SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN")]
+            if "INFO_TIPO_EDF_LAN_COUNT" not in cols_aux:
+                recriar_auxiliar = True
+        else:
+            recriar_auxiliar = True
+
+        if recriar_auxiliar:
+            print("Criando/Atualizando tabela auxiliar SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN...")
+            if "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" in tabelas_atuais:
+                conn.execute(text('DROP TABLE "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"'))
+            
             conn.execute(text("""
                 CREATE TABLE "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" (
                     "ISN_SIA_LANCIPTU_ASG" BIGINT PRIMARY KEY,
-                    "CODG_TIPO_EDIFICACAO_LAN" VARCHAR(2),
-                    "DESC_TIPO_EDIFICACAO_LAN" VARCHAR(100)
+                    "INFO_TIPO_EDF_LAN_COUNT" SMALLINT,
+                    "INFO_TIPO_EDF_LAN" SMALLINT,
+                    "cnxarraycolumn" SMALLINT
                 )
             """))
             conn.commit()
+
 
     print("Migração concluída.")
 
