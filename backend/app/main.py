@@ -23,7 +23,12 @@ app = FastAPI(
 # CORS — permite que o frontend Next.js se comunique com a API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://frontend:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:3001",
+        "http://frontend:3000",
+        "https://laniptu.geredados.com.br"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
