@@ -2,7 +2,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { fetcher, apiFetch } from "@/lib/api";
+import { fetcher, apiFetch } from "../../lib/api";
 
 interface Simulacao {
   id: string;

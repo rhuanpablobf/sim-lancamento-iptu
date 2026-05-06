@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef } from "react";
 import useSWR from "swr";
-import { fetcher, apiFetch } from "@/lib/api";
+import { fetcher, apiFetch } from "../../lib/api";
 
 const getBase = () => {
   if (typeof window !== "undefined") {

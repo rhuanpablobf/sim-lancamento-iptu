@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import useSWR from "swr";
-import { fetcher, apiFetch } from "@/lib/api";
+import { fetcher, apiFetch } from "../../lib/api";
 
 export default function NovaSimulacaoPage() {
   const router = useRouter();

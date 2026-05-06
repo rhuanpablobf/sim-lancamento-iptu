@@ -3,7 +3,7 @@ import { use, useState, useEffect } from "react";
 import useSWR from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { fetcher, apiFetch } from "@/lib/api";
+import { fetcher, apiFetch } from "../../../lib/api";
 
 interface SimulacaoDetalhe {
   id: string;

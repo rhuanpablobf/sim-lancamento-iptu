@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import useSWR from "swr";
-import { fetcher, apiFetch } from "@/lib/api";
+import { fetcher, apiFetch } from "../../lib/api";
 
 interface Simulacao {
   id: string;
