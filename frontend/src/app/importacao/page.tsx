@@ -149,35 +149,73 @@ export default function ImportacaoPage() {
               <div className="card-body">
                 <div className="form-group mb-16">
                   <label className="form-label">Tabela Principal (Lançamentos)</label>
-                  <div className={`upload-zone ${arquivo1 ? 'has-file' : ''}`} onClick={() => ref1.current?.click()}>
+                  <div 
+                    style={{ 
+                      border: "2px dashed var(--border)", 
+                      borderRadius: "var(--radius)", 
+                      padding: "24px", 
+                      textAlign: "center", 
+                      cursor: "pointer",
+                      background: arquivo1 ? "var(--green-light)" : "transparent",
+                      borderColor: arquivo1 ? "var(--green-mid)" : "var(--border)"
+                    }} 
+                    onClick={() => ref1.current?.click()}
+                  >
                     <input ref={ref1} type="file" accept=".csv" style={{ display: "none" }} onChange={e => setArquivo1(e.target.files?.[0] ?? null)}/>
                     <div className="zone-content">
-                      <span className="icon">{arquivo1 ? '📄' : '📁'}</span>
-                      <span className="text">{arquivo1 ? arquivo1.name : "Clique para selecionar"}</span>
+                      <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>{arquivo1 ? '📄' : '📁'}</span>
+                      <span style={{ fontSize: "13px", fontWeight: 500 }}>{arquivo1 ? arquivo1.name : "Clique para selecionar"}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="form-group mb-20">
                   <label className="form-label">Tabela Auxiliar (Tipos de Edif.)</label>
-                  <div className={`upload-zone ${arquivo2 ? 'has-file' : ''}`} onClick={() => ref2.current?.click()}>
+                  <div 
+                    style={{ 
+                      border: "2px dashed var(--border)", 
+                      borderRadius: "var(--radius)", 
+                      padding: "24px", 
+                      textAlign: "center", 
+                      cursor: "pointer",
+                      background: arquivo2 ? "var(--green-light)" : "transparent",
+                      borderColor: arquivo2 ? "var(--green-mid)" : "var(--border)"
+                    }} 
+                    onClick={() => ref2.current?.click()}
+                  >
                     <input ref={ref2} type="file" accept=".csv" style={{ display: "none" }} onChange={e => setArquivo2(e.target.files?.[0] ?? null)}/>
                     <div className="zone-content">
-                      <span className="icon">{arquivo2 ? '📄' : '📁'}</span>
-                      <span className="text">{arquivo2 ? arquivo2.name : "Opcional"}</span>
+                      <span style={{ fontSize: "24px", display: "block", marginBottom: "8px" }}>{arquivo2 ? '📄' : '📁'}</span>
+                      <span style={{ fontSize: "13px", fontWeight: 500 }}>{arquivo2 ? arquivo2.name : "Opcional"}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Modo de Inserção</label>
-                  <div className="segmented-control">
-                    <button className={modo === 'substituir' ? 'active' : ''} onClick={() => setModo('substituir')}>Substituir</button>
-                    <button className={modo === 'acumular' ? 'active' : ''} onClick={() => setModo('acumular')}>Acumular</button>
+                  <div style={{ display: "flex", background: "var(--bg)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                    <button 
+                      style={{ 
+                        flex: 1, border: "none", padding: "8px", fontSize: "12px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                        background: modo === 'substituir' ? "white" : "none",
+                        color: modo === 'substituir' ? "var(--text)" : "var(--text-muted)",
+                        boxShadow: modo === 'substituir' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                      }} 
+                      onClick={() => setModo('substituir')}
+                    >Substituir</button>
+                    <button 
+                      style={{ 
+                        flex: 1, border: "none", padding: "8px", fontSize: "12px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                        background: modo === 'acumular' ? "white" : "none",
+                        color: modo === 'acumular' ? "var(--text)" : "var(--text-muted)",
+                        boxShadow: modo === 'acumular' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                      }} 
+                      onClick={() => setModo('acumular')}
+                    >Acumular</button>
                   </div>
                 </div>
 
-                <button className="btn btn-primary w-100 mt-20" disabled={!arquivo1 || importando} onClick={importar}>
+                <button className="btn btn-primary" style={{ width: "100%", marginTop: "20px" }} disabled={!arquivo1 || importando} onClick={importar}>
                   {importando ? "Sincronizando..." : "Iniciar Importação"}
                 </button>
               </div>
@@ -187,8 +225,8 @@ export default function ImportacaoPage() {
               <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
                 <div className="card-body">
                   <div className="flex-between mb-8">
-                    <span className="text-xs fw-600 color-blue">{fase === 'upload' ? 'UPLOADING' : 'PROCESSING'}</span>
-                    <span className="text-xs text-mono fw-600">{progresso}%</span>
+                    <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--blue-txt)" }}>{fase === 'upload' ? 'UPLOADING' : 'PROCESSING'}</span>
+                    <span style={{ fontSize: "10px", fontWeight: 600 }}>{progresso}%</span>
                   </div>
                   <div className="progress-bar"><div className="progress-fill" style={{ width: `${progresso}%` }}></div></div>
                   <div className="text-xs mt-8 text-muted">{mensagemStatus}</div>
@@ -196,8 +234,8 @@ export default function ImportacaoPage() {
               </div>
             )}
 
-            {sucesso && <div className="alert alert-success mb-24">{sucesso}</div>}
-            {erro && <div className="alert alert-error mb-24">{erro}</div>}
+            {sucesso && <div className="badge badge-green p-12 w-100 mb-24" style={{ display: "block", textAlign: "center" }}>{sucesso}</div>}
+            {erro && <div className="badge badge-red p-12 w-100 mb-24" style={{ display: "block", textAlign: "center" }}>{erro}</div>}
           </div>
 
           <div style={{ flex: 1 }}>
@@ -232,7 +270,7 @@ export default function ImportacaoPage() {
                           </td>
                           <td className="right text-mono fw-600">{fmtMoeda(r.valr_imposto_total)}</td>
                           <td className="right">
-                            <button className="action-link color-red" onClick={() => {}}>limpar</button>
+                            <button className="action-link" style={{ color: "var(--red)" }} onClick={() => {}}>limpar</button>
                           </td>
                         </tr>
                       ))
@@ -244,72 +282,6 @@ export default function ImportacaoPage() {
           </div>
         </div>
       </div>
-
-      <style jsx>{`
-        .upload-zone {
-          border: 2px dashed var(--border);
-          border-radius: var(--radius);
-          padding: 24px;
-          text-align: center;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-        .upload-zone:hover {
-          border-color: var(--blue-mid);
-          background: var(--bg);
-        }
-        .upload-zone.has-file {
-          border-color: var(--green-mid);
-          background: var(--green-light);
-        }
-        .zone-content .icon {
-          font-size: 24px;
-          display: block;
-          margin-bottom: 8px;
-        }
-        .zone-content .text {
-          font-size: 13px;
-          font-weight: 500;
-          color: var(--text);
-        }
-        .segmented-control {
-          display: flex;
-          background: var(--bg);
-          padding: 4px;
-          border-radius: 8px;
-          border: 1px solid var(--border);
-        }
-        .segmented-control button {
-          flex: 1;
-          border: none;
-          background: none;
-          padding: 8px;
-          font-size: 12px;
-          font-weight: 500;
-          color: var(--text-muted);
-          cursor: pointer;
-          border-radius: 6px;
-        }
-        .segmented-control button.active {
-          background: white;
-          color: var(--text);
-          box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        }
-        .progress-bar {
-          height: 6px;
-          background: rgba(0,0,0,0.05);
-          border-radius: 3px;
-          overflow: hidden;
-        }
-        .progress-fill {
-          height: 100%;
-          background: var(--blue-txt);
-          transition: width 0.3s ease;
-        }
-        .color-blue { color: var(--blue-txt); }
-        .color-red { color: var(--red); }
-        .w-100 { width: 100%; }
-      `}</style>
     </div>
   );
 }
