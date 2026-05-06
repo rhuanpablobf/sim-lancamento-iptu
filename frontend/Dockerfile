@@ -22,8 +22,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV NEXT_TURBOPACK=0
 
-# O script de build agora tem --turbo=false no package.json
-RUN npm run build
+# O script de build agora é padrão, mas forçamos a desativação do Turbo via env
+RUN NEXT_TURBOPACK=0 npm run build
 
 EXPOSE 3000
 
