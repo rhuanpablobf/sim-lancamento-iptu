@@ -100,14 +100,12 @@ export default function DashboardPage() {
     ? `/api/importacao/dashboard?exercicio=${anoSelecionado || ""}` 
     : `/api/simulacoes/${contexto}/dashboard?exercicio=${anoSelecionado}`;
 
-  const { data, isLoading, error } = useSWR(
+  const { data } = useSWR(
     (contexto === "base" || (contexto !== "base" && anoSelecionado)) ? urlDashboard : null,
     fetcher
   );
 
   const d = data?.dados;
-  const kpis = d?.kpis;
-  const ant = d?.kpis_anterior;
 
   const urlConsolidado = contexto === "base"
     ? "/api/importacao/dashboard/consolidado-faixas"
@@ -469,7 +467,7 @@ export default function DashboardPage() {
                   </thead>
                   <tbody>
                     {Object.entries(matrizEdf).sort((a, b) => a[0].localeCompare(b[0])).map(([edf, lancamentos]) => {
-                      const totalRow = Object.values(lancamentos).reduce((acc, v) => acc + v, 0);
+                      const totalRow = Object.values(lancamentos).reduce((acc: number, v: number) => acc + v, 0);
                       return (
                         <tr key={edf}>
                           <td className="fw-500">{edf}</td>
@@ -487,13 +485,13 @@ export default function DashboardPage() {
                   <tfoot>
                     <tr style={{ background: "var(--surface-3)" }}>
                       <td className="fw-700">TOTAL GERAL</td>
-                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc, l) => acc + l["Normal"], 0))}</td>
-                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc, l) => acc + l["Isento/Imune"], 0))}</td>
-                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc, l) => acc + l["IPTU Social"], 0))}</td>
+                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc: number, l: any) => acc + (l["Normal"] || 0), 0))}</td>
+                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc: number, l: any) => acc + (l["Isento/Imune"] || 0), 0))}</td>
+                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc: number, l: any) => acc + (l["IPTU Social"] || 0), 0))}</td>
                       <td className="right text-mono fw-700" style={{ color: "var(--amber-txt)" }}>
-                        {fmtNum(Object.values(matrizEdf).reduce((acc, l) => acc + l["Imposto Mínimo"], 0))}
+                        {fmtNum(Object.values(matrizEdf).reduce((acc: number, l: any) => acc + (l["Imposto Mínimo"] || 0), 0))}
                       </td>
-                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc, l) => acc + Object.values(l).reduce((a, v) => a + v, 0), 0))}</td>
+                      <td className="right text-mono fw-700">{fmtNum(Object.values(matrizEdf).reduce((acc: number, l: any) => acc + Object.values(l).reduce((a: number, v: any) => a + (Number(v) || 0), 0), 0))}</td>
                     </tr>
                   </tfoot>
                 </table>
