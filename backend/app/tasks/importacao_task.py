@@ -120,10 +120,6 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
             chunks_aux = pd.read_csv(path_auxiliar, sep=";", encoding="utf-8", dtype=str, chunksize=100000)
             for chunk_aux in chunks_aux:
                 if not chunk_aux.empty:
-                    # Remove apenas duplicatas REAIS (mesmo imóvel com o mesmo tipo repetido no arquivo)
-                    # Isso permite múltiplos tipos diferentes por imóvel, mas evita erro de chave duplicada
-                    chunk_aux = chunk_aux.drop_duplicates(subset=["ISN_SIA_LANCIPTU_ASG", "INFO_TIPO_EDF_LAN"], keep="first")
-                    
                     with engine.begin() as conn:
                         chunk_aux.to_sql(
                             "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN",
