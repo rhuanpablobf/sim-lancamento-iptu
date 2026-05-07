@@ -150,7 +150,7 @@ export default function ImportacaoPage() {
           setTaskId(null);
           localStorage.removeItem('iptu_import_task_id');
           setErro("Erro no processamento dos dados.");
-        // Ignora erros temporários de conexão durante o pooling
+        }
       }
     }
   );
