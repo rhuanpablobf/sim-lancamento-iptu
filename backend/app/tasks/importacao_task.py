@@ -120,6 +120,9 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
             chunks_aux = pd.read_csv(path_auxiliar, sep=";", encoding="utf-8", dtype=str, chunksize=100000)
             for chunk_aux in chunks_aux:
                 if not chunk_aux.empty:
+                    # Remover duplicatas dentro do chunk para evitar UniqueViolation
+                    chunk_aux = chunk_aux.drop_duplicates(subset=["ISN_SIA_LANCIPTU_ASG"], keep="first")
+                    
                     with engine.begin() as conn:
                         chunk_aux.to_sql(
                             "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN",
