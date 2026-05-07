@@ -144,11 +144,17 @@ def migrar():
             """))
             conn.commit()
 
-        # Garantir que a tabela auxiliar exista com schema completo
+        # Garantir que a tabela auxiliar exista com schema completo e chave composta
         recriar_auxiliar = False
         if "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" in tabelas_atuais:
+            # Verificar as colunas
             cols_aux = [c["name"] for c in inspector.get_columns("SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN")]
-            if "INFO_TIPO_EDF_LAN_COUNT" not in cols_aux:
+            # Verificar a chave primária
+            pk_info = inspector.get_pk_constraint("SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN")
+            pk_cols = pk_info.get("constrained_columns", [])
+            
+            # Se faltar coluna ou a PK não for composta (precisa de 2 colunas: ISN + TIPO), recria
+            if "INFO_TIPO_EDF_LAN_COUNT" not in cols_aux or len(pk_cols) < 2:
                 recriar_auxiliar = True
         else:
             recriar_auxiliar = True
