@@ -271,31 +271,35 @@ export default function ImportacaoPage() {
               </div>
             </div>
 
-            {statusVps?.dados && !importando && (
-              <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
-                <div className="card-body">
-                  <div className="card-title mb-12" style={{ color: "var(--blue-txt)", fontSize: "14px" }}>📦 Status dos Arquivos na VPS</div>
-                  
-                  <div className="mb-16">
-                    <div className="flex-between mb-4">
-                      <span className="text-xs fw-500">Principal (Lançamentos)</span>
-                      <span className={`badge ${arquivosVps.principal?.existe ? 'badge-green' : 'badge-red'}`} style={{fontSize: '9px'}}>
-                        {arquivosVps.principal?.existe ? 'DETECTADO' : 'AUSENTE'}
-                      </span>
-                    </div>
-                    {arquivosVps.principal?.existe && <div className="text-2xs text-muted">{arquivosVps.principal.tamanho_mb} MB</div>}
+            {/* Card de Importação via VPS */}
+            <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
+              <div className="card-header">
+                <div className="card-title" style={{ color: "var(--blue-txt)", display: "flex", alignItems: "center", gap: "8px" }}>
+                  📦 Status dos Arquivos na VPS
+                </div>
+              </div>
+              <div className="card-body">
+                <div className="mb-20">
+                  <div className="flex-between mb-4">
+                    <span className="text-xs fw-500">Principal (Lançamentos)</span>
+                    <span className={`badge ${arquivosVps.principal?.existe ? 'badge-green' : 'badge-red'}`} style={{fontSize: '9px'}}>
+                      {arquivosVps.principal?.existe ? 'DETECTADO' : 'AUSENTE'}
+                    </span>
                   </div>
+                  {arquivosVps.principal?.existe && <div className="text-2xs text-muted">{arquivosVps.principal.tamanho_mb} MB</div>}
+                </div>
 
-                  <div className="mb-20">
-                    <div className="flex-between mb-4">
-                      <span className="text-xs fw-500">Auxiliar (Tipos Edif.)</span>
-                      <span className={`badge ${arquivosVps.auxiliar?.existe ? 'badge-green' : 'badge-gray'}`} style={{fontSize: '9px'}}>
-                        {arquivosVps.auxiliar?.existe ? 'DETECTADO' : 'OPCIONAL'}
-                      </span>
-                    </div>
-                    {arquivosVps.auxiliar?.existe && <div className="text-2xs text-muted">{arquivosVps.auxiliar.tamanho_mb} MB</div>}
+                <div className="mb-20">
+                  <div className="flex-between mb-4">
+                    <span className="text-xs fw-500">Auxiliar (Tipos Edif.)</span>
+                    <span className={`badge ${arquivosVps.auxiliar?.existe ? 'badge-green' : 'badge-gray'}`} style={{fontSize: '9px'}}>
+                      {arquivosVps.auxiliar?.existe ? 'DETECTADO' : 'OPCIONAL'}
+                    </span>
                   </div>
+                  {arquivosVps.auxiliar?.existe && <div className="text-2xs text-muted">{arquivosVps.auxiliar.tamanho_mb} MB</div>}
+                </div>
 
+                {!importando ? (
                   <button 
                     className="btn btn-primary w-100" 
                     style={{ background: vpsPronta ? "var(--blue-txt)" : "#ccc" }} 
@@ -304,9 +308,13 @@ export default function ImportacaoPage() {
                   >
                     {vpsPronta ? "Processar Arquivos Detectados" : "Aguardando Arquivo Principal..."}
                   </button>
-                </div>
+                ) : (
+                  <div className="text-center text-xs fw-600 color-blue">
+                    Processamento em curso...
+                  </div>
+                )}
               </div>
-            )}
+            </div>
 
             {importando && (
 
