@@ -170,9 +170,15 @@ export default function ImportacaoPage() {
     }
   );
 
-  function monitorarTask(tid: string) {
-    setTaskId(tid);
-    localStorage.setItem('iptu_import_task_id', tid);
+  async function excluirExercicio(ano: number) {
+    if (!confirm(`Deseja limpar todos os dados do exercício ${ano}?`)) return;
+    try {
+      await apiFetch(`/api/importacao/exercicio/${ano}`, { method: "DELETE" });
+      mutate();
+      setSucesso(`Exercício ${ano} excluído com sucesso.`);
+    } catch (err) {
+      setErro(`Erro ao excluir exercício ${ano}.`);
+    }
   }
 
   return (
@@ -366,7 +372,7 @@ export default function ImportacaoPage() {
                           </td>
                           <td className="right text-mono fw-600">{fmtMoeda(r.valr_imposto_total)}</td>
                           <td className="right">
-                            <button className="action-link" style={{ color: "var(--red)" }} onClick={() => {}}>limpar</button>
+                            <button className="action-link" style={{ color: "var(--red)" }} onClick={() => excluirExercicio(r.exercicio)}>limpar</button>
                           </td>
                         </tr>
                       ))

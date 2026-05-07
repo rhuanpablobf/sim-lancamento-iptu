@@ -88,8 +88,10 @@ export default function DashboardPage() {
   useEffect(() => {
     const lista = contexto === "base" ? anosBase : anosSimulacao;
     if (lista.length > 0) {
+      // Sempre tenta pegar o maior ano disponível para abrir o dashboard atualizado
+      const maiorAno = Math.max(...lista);
       if (!anoSelecionado || !lista.includes(anoSelecionado)) {
-        setAnoSelecionado(lista[0]);
+        setAnoSelecionado(maiorAno);
       }
     } else {
       setAnoSelecionado(null);
@@ -161,18 +163,32 @@ export default function DashboardPage() {
   };
 
   if (isLoading) {
-    return <div className="page active"><div className="page-content"><div className="table-empty">Carregando indicadores...</div></div></div>;
+    return (
+      <div className="page active">
+        <div className="page-header">
+           <div className="page-title">Carregando Dashboard...</div>
+        </div>
+        <div className="page-content">
+          <div className="card">
+            <div className="card-body" style={{ textAlign: "center", padding: "100px" }}>
+              <div className="table-empty">Processando indicadores financeiros e estatísticos...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  if (error || !d || !kpis) {
+  // Se não tem dados e não está carregando, mostra a base vazia
+  if (!d && !isLoading) {
     return (
       <div className="page active">
         <div className="page-content">
           <div className="card">
             <div className="card-body" style={{ textAlign: "center", padding: "40px" }}>
               <div style={{ fontSize: "32px", marginBottom: "12px" }}>📊</div>
-              <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "6px" }}>Dados indisponíveis</div>
-              <div className="text-sm text-muted">Certifique-se de que a base foi importada ou a simulação concluída.</div>
+              <div style={{ fontSize: "15px", fontWeight: 600, marginBottom: "6px" }}>Nenhum dado encontrado</div>
+              <div className="text-sm text-muted">A base do exercício selecionado está vazia ou não foi importada.</div>
             </div>
           </div>
         </div>
