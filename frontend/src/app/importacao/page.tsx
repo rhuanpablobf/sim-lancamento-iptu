@@ -253,15 +253,38 @@ export default function ImportacaoPage() {
               </div>
             </div>
 
-            {vpsPronta && !importando && (
+            {statusVps?.dados && !importando && (
               <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
                 <div className="card-body">
-                  <div className="card-title mb-8" style={{ color: "var(--blue-txt)", fontSize: "13px" }}>📦 Arquivos na VPS Detectados</div>
-                  <div className="text-xs mb-12 text-muted">
-                    Foram encontrados arquivos CSV diretamente no servidor ({arquivosVps.principal.tamanho_mb} MB). Você pode processá-los sem precisar fazer upload pelo navegador.
+                  <div className="card-title mb-12" style={{ color: "var(--blue-txt)", fontSize: "14px" }}>📦 Status dos Arquivos na VPS</div>
+                  
+                  <div className="mb-16">
+                    <div className="flex-between mb-4">
+                      <span className="text-xs fw-500">Principal (Lançamentos)</span>
+                      <span className={`badge ${arquivosVps.principal?.existe ? 'badge-green' : 'badge-red'}`} style={{fontSize: '9px'}}>
+                        {arquivosVps.principal?.existe ? 'DETECTADO' : 'AUSENTE'}
+                      </span>
+                    </div>
+                    {arquivosVps.principal?.existe && <div className="text-2xs text-muted">{arquivosVps.principal.tamanho_mb} MB</div>}
                   </div>
-                  <button className="btn btn-primary w-100" style={{ background: "var(--blue-txt)" }} onClick={importarVps}>
-                    Processar Arquivos do Servidor
+
+                  <div className="mb-20">
+                    <div className="flex-between mb-4">
+                      <span className="text-xs fw-500">Auxiliar (Tipos Edif.)</span>
+                      <span className={`badge ${arquivosVps.auxiliar?.existe ? 'badge-green' : 'badge-gray'}`} style={{fontSize: '9px'}}>
+                        {arquivosVps.auxiliar?.existe ? 'DETECTADO' : 'OPCIONAL'}
+                      </span>
+                    </div>
+                    {arquivosVps.auxiliar?.existe && <div className="text-2xs text-muted">{arquivosVps.auxiliar.tamanho_mb} MB</div>}
+                  </div>
+
+                  <button 
+                    className="btn btn-primary w-100" 
+                    style={{ background: vpsPronta ? "var(--blue-txt)" : "#ccc" }} 
+                    onClick={importarVps}
+                    disabled={!vpsPronta}
+                  >
+                    {vpsPronta ? "Processar Arquivos Detectados" : "Aguardando Arquivo Principal..."}
                   </button>
                 </div>
               </div>
