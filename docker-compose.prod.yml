@@ -36,6 +36,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATA_PATH=/data
+    volumes:
+      - /data:/data
     depends_on:
       db:
         condition: service_healthy
@@ -50,6 +55,11 @@ services:
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
       - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATA_PATH=/data
+    volumes:
+      - /data:/data
     depends_on:
       db:
         condition: service_healthy
