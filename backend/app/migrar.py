@@ -160,10 +160,11 @@ def migrar():
             
             conn.execute(text("""
                 CREATE TABLE "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" (
-                    "ISN_SIA_LANCIPTU_ASG" BIGINT PRIMARY KEY,
+                    "ISN_SIA_LANCIPTU_ASG" BIGINT,
                     "INFO_TIPO_EDF_LAN_COUNT" SMALLINT,
                     "INFO_TIPO_EDF_LAN" SMALLINT,
-                    "cnxarraycolumn" SMALLINT
+                    "cnxarraycolumn" SMALLINT,
+                    PRIMARY KEY ("ISN_SIA_LANCIPTU_ASG", "INFO_TIPO_EDF_LAN")
                 )
             """))
             conn.commit()
