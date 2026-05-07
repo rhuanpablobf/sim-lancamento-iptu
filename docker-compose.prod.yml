@@ -33,6 +33,8 @@ services:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
     container_name: iptu_backend
     restart: always
+    ports:
+      - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
       - REDIS_URL=redis://redis:6379/0
