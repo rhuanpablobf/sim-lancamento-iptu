@@ -44,10 +44,8 @@ services:
     volumes:
       - /opt/dados_iptu:/data
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - db
+      - redis
 
   worker:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
@@ -63,10 +61,8 @@ services:
     volumes:
       - /opt/dados_iptu:/data
     depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - db
+      - redis
 
   frontend:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-frontend:latest
