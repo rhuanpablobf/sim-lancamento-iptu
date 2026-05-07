@@ -79,6 +79,7 @@ services:
   frontend:
     build:
       context: ./frontend
+      target: development
     container_name: iptu_frontend
     restart: always
     command: npm run dev

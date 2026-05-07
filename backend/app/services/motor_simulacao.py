@@ -229,8 +229,12 @@ def simular_exercicio(
     # ETAPA 6 — IPTU Social (Regra de Ouro)
     limite_social = _calcular_limite_iptu_social(parametros, configs_base, ano, indexador_social)
     
-    indice_acumulado = df["valr_venal_simulado"] / df["VALR_VENAL_LAN"].astype(float).replace(0, 1)
-    valr_venal_comparacao_social = df["valr_venal_social_base"].astype(float) * indice_acumulado
+    # O índice acumulado para fins de IPTU Social deve refletir a correção total desde o ano base original
+    # Usamos o valor venal atual (projetado) dividido pelo valor venal original (da base de cálculo)
+    # O valor de comparação para o IPTU Social (que pode ser a soma de Apto+Box) 
+    # deve ser corrigido pelo IPCA do ano para manter a paridade com o valor venal simulado.
+    df["valr_venal_social_simulado"] = df["valr_venal_social_base"].astype(float) * (1 + ipca)
+    valr_venal_comparacao_social = df["valr_venal_social_simulado"]
 
     mask_social = (
         (df["TIPO_IMPOSTO_LAN"] == 1)      # Predial
@@ -444,17 +448,23 @@ def executar_motor_completo(
         )
 
         # Próximo ano usa o resultado como base
-        df_base = df_resultado.rename(
+        # IMPORTANTÍSSIMO: Dropamos as colunas originais antes do rename para evitar duplicidade
+        # e garantir que o '~duplicated()' mantenha o valor atualizado e não o antigo.
+        cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN"]
+        df_base_next = df_resultado.drop(columns=[c for c in cols_base_antigas if c in df_resultado.columns])
+        
+        df_base = df_base_next.rename(
             columns={
                 "valr_venal_simulado": "VALR_VENAL_LAN",
                 "valr_imposto_final": "VALR_IMPOSTO_LAN",
+                "valr_venal_social_simulado": "valr_venal_social_base"
             }
         ).reset_index(drop=True)
         
         # Limpar colunas de cálculo do ano anterior para não duplicar no próximo
-        cols_limpar = ["faixa_atual", "faixa_label", "valr_aliquota_calculada", "faixa_anterior", "migrou_faixa"]
+        cols_limpar = ["faixa_atual", "faixa_label", "valr_aliquota_calculada", "faixa_anterior", "migrou_faixa", "valr_venal_social_simulado"]
         df_base = df_base.drop(columns=[c for c in cols_limpar if c in df_base.columns])
-        # Remover duplicatas por nome (segurança extra)
+        # Remover duplicatas por nome (segurança extra, agora o valor atualizado será o único)
         df_base = df_base.loc[:, ~df_base.columns.duplicated()]
         
         faixas_base = faixas_novo

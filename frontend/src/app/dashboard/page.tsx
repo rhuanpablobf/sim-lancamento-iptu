@@ -44,15 +44,19 @@ interface SimulacaoMin {
 
 // ─── Formatadores ─────────────────────────────────────────────────────────────
 
-const fmtNum = (n: number) => n?.toLocaleString("pt-BR") ?? "—";
+const fmtNum = (n: any) => {
+  const val = typeof n === "string" ? parseFloat(n) : n;
+  return (val !== null && val !== undefined && !isNaN(val)) ? val.toLocaleString("pt-BR") : "—";
+};
 
-const fmtMoeda = (n: number) => {
-  if (!n || isNaN(n)) return "—";
-  const absN = Math.abs(n);
-  let prefix = n < 0 ? "- " : "";
+const fmtMoeda = (n: any) => {
+  const val = typeof n === "string" ? parseFloat(n) : n;
+  if (val === null || val === undefined || isNaN(val)) return "—";
+  const absN = Math.abs(val);
+  let prefix = val < 0 ? "- " : "";
   if (absN >= 1e9) return `${prefix}R$ ${(absN / 1e9).toLocaleString("pt-BR", { minimumFractionDigits: 1 })} bi`;
   if (absN >= 1e6) return `${prefix}R$ ${(absN / 1e6).toLocaleString("pt-BR", { minimumFractionDigits: 1 })} M`;
-  return prefix + absN.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return prefix + val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 };
 
 const fmtPct = (parte: number, total: number) =>
@@ -108,8 +112,8 @@ export default function DashboardPage() {
   );
 
   const d = data?.dados;
-  const kpis = d?.kpis_atuais;
-  const ant = d?.kpis_anteriores;
+  const kpis = d?.kpis || null;
+  const ant = d?.kpis_anterior || null;
 
   const urlConsolidado = contexto === "base"
     ? "/api/importacao/dashboard/consolidado-faixas"
@@ -179,8 +183,8 @@ export default function DashboardPage() {
     );
   }
 
-  // Se não tem dados e não está carregando, mostra a base vazia
-  if (!d && !isLoading) {
+  // Se não tem dados ou KPIs essenciais e não está carregando, mostra a base vazia
+  if ((!d || !kpis) && !isLoading) {
     return (
       <div className="page active">
         <div className="page-content">
@@ -196,9 +200,9 @@ export default function DashboardPage() {
     );
   }
 
-  const varImoveis  = variacao(kpis.total_imoveis, ant?.total_imoveis, d.exercicio_anterior || d.exercicio_base);
-  const varVenal    = variacao(kpis.valr_venal_total, ant?.valr_venal_total, d.exercicio_anterior || d.exercicio_base);
-  const varImposto  = variacao(kpis.valr_imposto_total, ant?.valr_imposto_total, d.exercicio_anterior || d.exercicio_base);
+  const varImoveis  = variacao(kpis?.total_imoveis || 0, ant?.total_imoveis, d?.exercicio_anterior || d?.exercicio_base);
+  const varVenal    = variacao(kpis?.valr_venal_total || 0, ant?.valr_venal_total, d?.exercicio_anterior || d?.exercicio_base);
+  const varImposto  = variacao(kpis?.valr_imposto_total || 0, ant?.valr_imposto_total, d?.exercicio_anterior || d?.exercicio_base);
 
 
   const renderDelta = (vAtual: number, vAnterior: number) => {
@@ -263,29 +267,29 @@ export default function DashboardPage() {
         <div className="kpi-grid">
           <div className="kpi-card">
             <div className="kpi-label">Total de imóveis</div>
-            <div className="kpi-value">{fmtNum(kpis.total_imoveis)}</div>
+            <div className="kpi-value">{fmtNum(kpis?.total_imoveis || 0)}</div>
             {varImoveis ? (
               <div className={`kpi-delta ${varImoveis.pct > 0 ? "up" : varImoveis.pct < 0 ? "down" : "neu"}`}>{varImoveis.texto}</div>
             ) : <div className="kpi-delta neu">— sem variação</div>}
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Valor venal total</div>
-            <div className="kpi-value">{fmtMoeda(kpis.valr_venal_total)}</div>
+            <div className="kpi-value">{fmtMoeda(kpis?.valr_venal_total || 0)}</div>
             {varVenal ? (
               <div className={`kpi-delta ${varVenal.pct > 0 ? "up" : "down"}`}>{varVenal.texto}</div>
             ) : <div className="kpi-delta neu">— base de referência</div>}
           </div>
           <div className="kpi-card">
             <div className="kpi-label">Imposto total</div>
-            <div className="kpi-value">{fmtMoeda(kpis.valr_imposto_total)}</div>
+            <div className="kpi-value">{fmtMoeda(kpis?.valr_imposto_total || 0)}</div>
             {varImposto ? (
               <div className={`kpi-delta ${varImposto.pct > 0 ? "up" : "down"}`}>{varImposto.texto}</div>
             ) : <div className="kpi-delta neu">— cálculo inicial</div>}
           </div>
           <div className="kpi-card">
             <div className="kpi-label">IPTU Social</div>
-            <div className="kpi-value">{fmtNum(kpis.iptu_social)}</div>
-            <div className="kpi-delta neu">↑ {fmtPct(kpis.iptu_social, kpis.total_imoveis)} da base total</div>
+            <div className="kpi-value">{fmtNum(kpis?.iptu_social || 0)}</div>
+            <div className="kpi-delta neu">↑ {fmtPct(kpis?.iptu_social || 0, kpis?.total_imoveis || 0)} da base total</div>
           </div>
         </div>
 
@@ -311,14 +315,14 @@ export default function DashboardPage() {
                       <td>{row.exercicio}</td>
                       <td className="right">{fmtNum(row.quantidade)}</td>
                       <td className="right mono">{fmtMoeda(row.limite_vigente)}</td>
-                      <td className="right">{fmtPct(row.quantidade, kpis.total_imoveis)}</td>
+                      <td className="right">{fmtPct(row.quantidade, kpis?.total_imoveis || 0)}</td>
                     </tr>
                   ))}
                   <tr style={{ background: "var(--blue-light)" }}>
-                    <td><span className="badge badge-blue">{anoSelecionado || d.exercicio_atual} ✦</span></td>
-                    <td className="right fw-500">{fmtNum(kpis.iptu_social)}</td>
-                    <td className="right mono fw-500">{fmtMoeda(kpis.limite_social)}</td>
-                    <td className="right fw-500">{fmtPct(kpis.iptu_social, kpis.total_imoveis)}</td>
+                    <td><span className="badge badge-blue">{anoSelecionado || d?.exercicio_atual} ✦</span></td>
+                    <td className="right fw-500">{fmtNum(kpis?.iptu_social || 0)}</td>
+                    <td className="right mono fw-500">{fmtMoeda(kpis?.limite_social || 0)}</td>
+                    <td className="right fw-500">{fmtPct(kpis?.iptu_social || 0, kpis?.total_imoveis || 0)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -334,11 +338,11 @@ export default function DashboardPage() {
               <div className="kpi-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: 0 }}>
                 <div className="kpi-card" style={{ padding: "12px 14px" }}>
                   <div className="kpi-label">Quantidade</div>
-                  <div className="kpi-value" style={{ fontSize: "20px" }}>{fmtNum(kpis.imposto_minimo)}</div>
+                  <div className="kpi-value" style={{ fontSize: "20px" }}>{fmtNum(kpis?.imposto_minimo || 0)}</div>
                 </div>
                 <div className="kpi-card" style={{ padding: "12px 14px" }}>
-                  <div className="kpi-label">Valor mínimo {anoSelecionado || d.exercicio_atual}</div>
-                  <div className="kpi-value" style={{ fontSize: "18px", fontFamily: "var(--font-mono)" }}>{fmtMoeda(kpis.valr_minimo)}</div>
+                  <div className="kpi-label">Valor mínimo {anoSelecionado || d?.exercicio_atual}</div>
+                  <div className="kpi-value" style={{ fontSize: "18px", fontFamily: "var(--font-mono)" }}>{fmtMoeda(kpis?.valr_minimo || 0)}</div>
                 </div>
               </div>
               <div className="text-xs text-muted mt-12">
