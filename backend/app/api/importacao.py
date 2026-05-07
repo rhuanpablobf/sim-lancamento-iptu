@@ -246,32 +246,34 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             ex = row_exercicio["max_ex"]
         kpis = db.execute(text("""
             SELECT COUNT(*) AS total_imoveis,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = '1') AS isentos,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = '2') AS imposto_minimo,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = '3') AS iptu_social,
-                   COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '1') AS predial,
-                   COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '2') AS territorial,
+                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1) AS isentos,
+                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
+                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3) AS iptu_social,
+                   COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = 1) AS predial,
+                   COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = 2) AS territorial,
                    COALESCE(SUM(CAST("VALR_VENAL_LAN" AS NUMERIC)), 0) AS valr_venal_total,
                    COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valr_imposto_total,
                    COALESCE(AVG(CAST("VALR_ALIQUOTA_LAN" AS NUMERIC)), 0) AS aliquota_media
             FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" = :ex
-        """), {"ex": str(ex)}).mappings().one()
+        """), {"ex": ex}).mappings().one()
+        
         categorias = db.execute(text("""
-            SELECT CASE WHEN "TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
-                        WHEN "INFO_USO_LAN" = '1' THEN 'Residencial'
+            SELECT CASE WHEN "TIPO_IMPOSTO_LAN" = 2 THEN 'Territorial'
+                        WHEN "INFO_USO_LAN" = 1 THEN 'Residencial'
                         ELSE 'Não Residencial' END AS categoria,
                    COUNT(*) AS total,
                    COALESCE(SUM(CAST("VALR_VENAL_LAN" AS NUMERIC)), 0) AS venal_total,
                    COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS imposto_total
             FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" = :ex
             GROUP BY 1 ORDER BY total DESC
-        """), {"ex": str(ex)}).mappings().all()
+        """), {"ex": ex}).mappings().all()
+        
         kpis_ant = db.execute(text("""
             SELECT COUNT(*) AS total_imoveis,
                    COALESCE(SUM(CAST("VALR_VENAL_LAN" AS NUMERIC)), 0) AS valr_venal_total,
                    COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valr_imposto_total
             FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" = :ex
-        """), {"ex": str(ex - 1)}).mappings().one_or_none()
+        """), {"ex": ex - 1}).mappings().one_or_none()
         faixas = db.execute(text("""
             SELECT faixa_codigo, faixa_label, faixa_ordem,
                    COUNT(*) AS total,

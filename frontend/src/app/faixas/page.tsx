@@ -230,7 +230,6 @@ export default function FaixasPage() {
             alignItems: "center", justifyContent: "center", zIndex: 1000,
             backdropFilter: "blur(4px)"
           }} 
-          onClick={() => setExibirModal(false)}
         >
           <div className="card" style={{ width: "400px", boxShadow: "0 20px 50px rgba(0,0,0,0.2)" }} onClick={e => e.stopPropagation()}>
             <div className="card-header">
@@ -262,11 +261,13 @@ export default function FaixasPage() {
                 <div className="form-group">
                   <label className="form-label">Alíquota (%)</label>
                   <input
-                    type="number"
-                    step="0.01"
+                    type="text"
                     required
-                    value={(novaFaixa.aliquota * 100).toFixed(2)}
-                    onChange={e => setNovaFaixa({ ...novaFaixa, aliquota: Number(e.target.value) / 100 })}
+                    value={(novaFaixa.aliquota * 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                    onChange={e => {
+                       const v = parseMoeda(formatarMoedaInput(e.target.value));
+                       setNovaFaixa({ ...novaFaixa, aliquota: v / 100 });
+                    }}
                   />
                   <div className="form-hint">Exemplo: 1,50 para um e meio porcento.</div>
                 </div>
