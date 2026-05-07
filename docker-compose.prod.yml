@@ -1,24 +1,6 @@
 version: '3.8'
 
 services:
-  db:
-    image: postgres:15-alpine
-    container_name: iptu_postgres
-    restart: always
-    environment:
-      POSTGRES_USER: ${DB_USER:-iptu_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-iptu_password}
-      POSTGRES_DB: ${DB_NAME:-lancamento-iptu}
-    ports:
-      - "5433:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   redis:
     image: redis:7-alpine
     container_name: iptu_redis
@@ -36,7 +18,8 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
+      # AJUSTE O HOST ABAIXO (atualmente localhost ou IP da VPS)
+      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@10.0.1.177:5432/lancamento-iptu
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -44,7 +27,6 @@ services:
     volumes:
       - /opt/dados_iptu:/data
     depends_on:
-      - db
       - redis
 
   worker:
@@ -53,7 +35,7 @@ services:
     restart: always
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     environment:
-      - DATABASE_URL=postgresql://${DB_USER:-iptu_user}:${DB_PASSWORD:-iptu_password}@db:5432/${DB_NAME:-lancamento-iptu}
+      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@10.0.1.177:5432/lancamento-iptu
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -61,7 +43,6 @@ services:
     volumes:
       - /opt/dados_iptu:/data
     depends_on:
-      - db
       - redis
 
   frontend:
