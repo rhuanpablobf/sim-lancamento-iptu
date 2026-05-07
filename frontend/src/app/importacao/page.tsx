@@ -130,28 +130,26 @@ export default function ImportacaoPage() {
     xhr.send(fd);
   }
 
-  function monitorarTask(taskId: string) {
-    const interval = setInterval(async () => {
-      try {
-        const status: any = await apiFetch(`/api/importacao/task/${taskId}`);
-        
-        if (status.status === "SUCCESS" || status.status === "CONCLUIDO") {
-          clearInterval(interval);
+  // Monitoramento da Task
+  useSWR(
+    taskId ? `/api/importacao/task/${taskId}` : null,
+    fetcher,
+    { 
+      refreshInterval: 3000,
+      revalidateOnFocus: true,
+      onSuccess: (data: any) => {
+        if (data?.status === 'SUCCESS' || data?.status === 'CONCLUIDO') {
+          setImportando(false);
+          setTaskId(null);
+          localStorage.removeItem('iptu_import_task_id');
           setSucesso("Sincronização concluída com sucesso.");
-          setImportando(false);
-          setFase(null);
-          setArquivo1(null);
-          setArquivo2(null);
           mutate();
-        } else if (status.status === "PROGRESS") {
-          setProgresso(status.progresso || 0);
-          setMensagemStatus(status.mensagem || "Processando...");
-        } else if (status.status === "FAILURE") {
-          clearInterval(interval);
-          setErro("Erro no processamento dos dados.");
-          setImportando(false);
         }
-      } catch (err) {
+        if (data?.status === 'FAILURE') {
+          setImportando(false);
+          setTaskId(null);
+          localStorage.removeItem('iptu_import_task_id');
+          setErro("Erro no processamento dos dados.");
         // Ignora erros temporários de conexão durante o pooling
       }
     }, 2000);
