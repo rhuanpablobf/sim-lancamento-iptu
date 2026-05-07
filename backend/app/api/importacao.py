@@ -133,31 +133,32 @@ async def upload_csv(
         raise HTTPException(status_code=500, detail=f"Erro ao salvar arquivos: {str(e)}")
 
 @router.get("/task/{task_id}", summary="Consultar status de uma tarefa")
-def consultar_task(task_id: str):
-    """Retorna o status e progresso de uma tarefa do Celery."""
+async def consultar_status(task_id: str):
+    """Retorna o progresso atual de uma tarefa do Celery."""
     try:
-        res = celery_app.AsyncResult(task_id)
+        from celery.result import AsyncResult
+        from app.celery_app import celery_app
         
+        res = AsyncResult(task_id, app=celery_app)
+        
+        status = res.status
         progresso = 0
         mensagem = ""
+        detalhes = {}
         
-        if res.state == 'PROGRESS':
-            info = res.info if isinstance(res.info, dict) else {}
-            progresso = info.get('progresso', 0)
-            mensagem = info.get('mensagem', '')
-        elif res.state == 'FAILURE':
-            mensagem = str(res.result)
+        if res.info:
+            if isinstance(res.info, dict):
+                progresso = res.info.get("progresso", 0)
+                mensagem = res.info.get("mensagem", "")
+                detalhes = res.info.get("detalhes", {})
+            elif isinstance(res.info, Exception):
+                mensagem = str(res.info)
         
-        return {
-            "status": res.state,
+        return RespostaPadrao(dados={
+            "id": task_id,
+            "status": status,
             "progresso": progresso,
             "mensagem": mensagem,
-            "resultado": res.result if res.ready() else None
-        }
-    except Exception as e:
-        import logging
-        logging.error(f"Erro ao consultar task {task_id}: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # --- Manter os outros endpoints (excluir, status, dashboard) ---
 # (Eu vou manter os outros endpoints que já existiam mas vou simplificar o arquivo para focar no novo fluxo)
