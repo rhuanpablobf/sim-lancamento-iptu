@@ -54,7 +54,39 @@ export default function ImportacaoPage() {
   const { data, mutate } = useSWR<RespostaStatus>("/api/importacao/status", fetcher);
   const resultado = data?.dados ?? [];
 
+  const { data: statusVps, mutate: mutateVps } = useSWR("/api/importacao/detectar-vps", fetcher, { refreshInterval: 5000 });
+  const arquivosVps = statusVps?.dados ?? {};
+  const vpsPronta = arquivosVps.principal?.existe;
+
+  async function importarVps() {
+    if (!vpsPronta) return;
+    setImportando(true);
+    setFase("processamento");
+    setProgresso(0);
+    setMensagemStatus("Iniciando processamento direto do servidor...");
+    setErro(null);
+    setSucesso(null);
+
+    try {
+      const fd = new FormData();
+      fd.append("modo", modo);
+      
+      const resp: any = await apiFetch("/api/importacao/processar-vps", {
+        method: "POST",
+        body: fd
+      });
+
+      if (resp.dados?.task_id) {
+        monitorarTask(resp.dados.task_id);
+      }
+    } catch (err) {
+      setErro("Falha ao iniciar processamento local.");
+      setImportando(false);
+    }
+  }
+
   async function importar() {
+
     if (!arquivo1) return alert("Selecione o arquivo principal.");
     setImportando(true);
     setFase("upload");
@@ -221,7 +253,22 @@ export default function ImportacaoPage() {
               </div>
             </div>
 
+            {vpsPronta && !importando && (
+              <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
+                <div className="card-body">
+                  <div className="card-title mb-8" style={{ color: "var(--blue-txt)", fontSize: "13px" }}>📦 Arquivos na VPS Detectados</div>
+                  <div className="text-xs mb-12 text-muted">
+                    Foram encontrados arquivos CSV diretamente no servidor ({arquivosVps.principal.tamanho_mb} MB). Você pode processá-los sem precisar fazer upload pelo navegador.
+                  </div>
+                  <button className="btn btn-primary w-100" style={{ background: "var(--blue-txt)" }} onClick={importarVps}>
+                    Processar Arquivos do Servidor
+                  </button>
+                </div>
+              </div>
+            )}
+
             {importando && (
+
               <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
                 <div className="card-body">
                   <div className="flex-between mb-8">

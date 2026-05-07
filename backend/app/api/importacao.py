@@ -13,8 +13,63 @@ from app.models import ParametroMacroeconomico
 router = APIRouter()
 
 UPLOAD_DIR = "uploads"
+DATA_DIR_VPS = os.getenv("DATA_PATH", "/data")
+
 if not os.path.exists(UPLOAD_DIR):
     os.makedirs(UPLOAD_DIR)
+
+@router.get("/detectar-vps", summary="Verificar se existem arquivos na pasta /data da VPS")
+async def detectar_vps():
+    """Verifica a presença dos arquivos CSV na pasta de volume compartilhado."""
+    arquivos = {
+        "principal": "raw_lancamento_iptu.csv",
+        "auxiliar": "raw_lancamento_iptu_tipo_edf.csv"
+    }
+    
+    status = {}
+    for chave, nome in arquivos.items():
+        caminho = os.path.join(DATA_DIR_VPS, nome)
+        existe = os.path.exists(caminho)
+        tamanho = os.path.getsize(caminho) if existe else 0
+        status[chave] = {
+            "nome": nome,
+            "existe": existe,
+            "tamanho_mb": round(tamanho / (1024 * 1024), 2) if existe else 0
+        }
+    
+    return RespostaPadrao(dados=status)
+
+@router.post("/processar-vps", summary="Processar arquivos que já estão na VPS")
+async def processar_vps(
+    modo: str = Form(default="substituir"),
+    db: Session = Depends(obter_sessao)
+) -> RespostaPadrao:
+    """Inicia o processamento dos arquivos localizados em /data."""
+    path_principal = os.path.join(DATA_DIR_VPS, "raw_lancamento_iptu.csv")
+    path_auxiliar = os.path.join(DATA_DIR_VPS, "raw_lancamento_iptu_tipo_edf.csv")
+    
+    if not os.path.exists(path_principal):
+        raise HTTPException(status_code=404, detail="Arquivo principal não encontrado na VPS.")
+        
+    import_id = f"vps_{str(uuid.uuid4())[:8]}"
+    
+    # Se o arquivo auxiliar não existir, passamos None
+    if not os.path.exists(path_auxiliar):
+        path_auxiliar = None
+
+    # Disparar Task Celery
+    from app.tasks.importacao_task import importar_csv_task
+    task = importar_csv_task.delay(path_principal, path_auxiliar, modo, import_id)
+    
+    return RespostaPadrao(
+        dados={
+            "task_id": task.id,
+            "import_id": import_id,
+            "status": "ENFILEIRADO"
+        },
+        meta={"mensagem": "Processamento local iniciado com sucesso."}
+    )
+
 
 @router.post("/upload", summary="Enviar CSVs de lançamento (Assíncrono)")
 async def upload_csv(
