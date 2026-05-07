@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import useSWR from "swr";
 import { fetcher, apiFetch } from "../../lib/api";
 
@@ -47,6 +47,7 @@ export default function ImportacaoPage() {
   const [mensagemStatus, setMensagemStatus] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [sucesso, setSucesso] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
   
   const ref1 = useRef<HTMLInputElement>(null);
   const ref2 = useRef<HTMLInputElement>(null);
@@ -130,30 +131,49 @@ export default function ImportacaoPage() {
     xhr.send(fd);
   }
 
-  // Monitoramento da Task
+  const BASE = getBase();
+
+  // Recuperar task pendente ao carregar
+  useEffect(() => {
+    const savedTaskId = localStorage.getItem('iptu_import_task_id');
+    if (savedTaskId) {
+      setTaskId(savedTaskId);
+      setImportando(true);
+    }
+  }, []);
+
+  // Monitoramento da Task via SWR
   useSWR(
-    taskId ? `/api/importacao/task/${taskId}` : null,
+    taskId ? `${BASE}/api/importacao/task/${taskId}` : null,
     fetcher,
     { 
       refreshInterval: 3000,
       revalidateOnFocus: true,
       onSuccess: (data: any) => {
-        if (data?.status === 'SUCCESS' || data?.status === 'CONCLUIDO') {
+        const info = data?.dados || {};
+        if (info.status === 'SUCCESS') {
           setImportando(false);
           setTaskId(null);
           localStorage.removeItem('iptu_import_task_id');
           setSucesso("Sincronização concluída com sucesso.");
           mutate();
-        }
-        if (data?.status === 'FAILURE') {
+        } else if (info.status === 'FAILURE') {
           setImportando(false);
           setTaskId(null);
           localStorage.removeItem('iptu_import_task_id');
-          setErro("Erro no processamento dos dados.");
+          setErro("Erro no processamento: " + (info.mensagem || "Erro desconhecido"));
+        } else if (info.status === 'PROGRESS' || info.status === 'PENDING') {
+          setProgresso(info.progresso || 0);
+          setMensagemStatus(info.mensagem || "Processando registros...");
         }
       }
     }
   );
+
+  function monitorarTask(tid: string) {
+    setTaskId(tid);
+    localStorage.setItem('iptu_import_task_id', tid);
+  }
 
   return (
     <div className="page active">
