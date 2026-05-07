@@ -152,8 +152,8 @@ export default function ImportacaoPage() {
           setErro("Erro no processamento dos dados.");
         // Ignora erros temporários de conexão durante o pooling
       }
-    }, 2000);
-  }
+    }
+  );
 
   return (
     <div className="page active">
