@@ -66,19 +66,26 @@ def _processar_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, import_id: str):
     """Task otimizada para processar arquivos CSV gigantes (COPY method + Chunks)."""
     try:
-        self.update_state(state='PROGRESS', meta={'progresso': 5, 'mensagem': 'Iniciando importação otimizada...'})
-        
+        # Contagem rápida de linhas para progresso real
+        def contar_linhas(caminho):
+            try:
+                with open(caminho, 'rb') as f:
+                    return sum(1 for _ in f) - 1
+            except:
+                return 0
+
+        total_linhas_prin = contar_linhas(path_principal)
+        total_linhas_aux = contar_linhas(path_auxiliar) if path_auxiliar and os.path.exists(path_auxiliar) else 0
+
         # 1. Identificar exercícios para limpeza se modo for substituir
-        # Lemos apenas a coluna de exercício primeiro para ser rápido
+        self.update_state(state='PROGRESS', meta={'progresso': 5, 'mensagem': 'Analisando exercícios no arquivo...'})
         df_anos = pd.read_csv(path_principal, sep=";", usecols=["CODG_EXERCICIO_LAN"], encoding="utf-8")
         anos = df_anos["CODG_EXERCICIO_LAN"].dropna().unique().tolist()
         
         if (modo == "substituir" or modo == "tudo") and anos:
-            self.update_state(state='PROGRESS', meta={'progresso': 10, 'mensagem': 'Limpando dados antigos...'})
+            self.update_state(state='PROGRESS', meta={'progresso': 10, 'mensagem': f'Limpando dados antigos de {len(anos)} exercícios...'})
             with engine.begin() as conn:
                 for ano in anos:
-                    # 1. Limpar auxiliar primeiro (por segurança, embora o delete orfãos devesse resolver)
-                    # Mas como não tem FK Cascade, limpamos manualmente registros associados aos anos da principal
                     conn.execute(text("""
                         DELETE FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" 
                         WHERE "ISN_SIA_LANCIPTU_ASG" IN (
@@ -86,60 +93,59 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
                             WHERE "CODG_EXERCICIO_LAN" = :ano
                         )
                     """), {"ano": int(ano)})
-                    
-                    # 2. Limpar principal
                     conn.execute(text('DELETE FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" = :ano'), {"ano": int(ano)})
 
         # 2. Processar e Inserir o arquivo Principal em Chunks
-        self.update_state(state='PROGRESS', meta={'progresso': 20, 'mensagem': 'Lendo e inserindo dados principais (via COPY)...'})
-        
         total_processado = 0
-        # Usamos chunksize para não estourar a RAM
         chunks = pd.read_csv(path_principal, sep=";", encoding="utf-8", dtype=str, chunksize=100000)
         
         for i, chunk in enumerate(chunks):
             df_chunk = _processar_dataframe(chunk)
             if not df_chunk.empty:
                 with engine.begin() as conn:
-                    df_chunk.to_sql(
-                        "SIA_LANCIPTU_ASG",
-                        conn,
-                        if_exists="append",
-                        index=False,
-                        method=psql_insert_copy  # MÉTODO ULTRA RÁPIDO
-                    )
+                    df_chunk.to_sql("SIA_LANCIPTU_ASG", conn, if_exists="append", index=False, method=psql_insert_copy)
+                
                 total_processado += len(df_chunk)
-                prog = min(20 + (i * 5), 70) # Avança progresso gradualmente
-                self.update_state(state='PROGRESS', meta={'progresso': prog, 'mensagem': f'Processado {total_processado} registros...'})
+                # Progresso de 15% a 70%
+                prog = 15
+                if total_linhas_prin > 0:
+                    prog = int(15 + (total_processado / total_linhas_prin) * 55)
+                
+                self.update_state(state='PROGRESS', meta={
+                    'progresso': min(prog, 70), 
+                    'mensagem': f'Arquivo Principal: {total_processado:,} de {total_linhas_prin:,} registros...'.replace(',', '.')
+                })
 
         # 3. Processar e Inserir o arquivo Auxiliar (se existir)
         total_aux = 0
         if path_auxiliar and os.path.exists(path_auxiliar):
-            self.update_state(state='PROGRESS', meta={'progresso': 80, 'mensagem': 'Processando tabela auxiliar...'})
-            
+            self.update_state(state='PROGRESS', meta={'progresso': 70, 'mensagem': 'Iniciando arquivo auxiliar...'})
             chunks_aux = pd.read_csv(path_auxiliar, sep=";", encoding="utf-8", dtype=str, chunksize=100000)
             for chunk_aux in chunks_aux:
                 if not chunk_aux.empty:
                     with engine.begin() as conn:
-                        chunk_aux.to_sql(
-                            "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN",
-                            conn,
-                            if_exists="append",
-                            index=False,
-                            method=psql_insert_copy
-                        )
+                        chunk_aux.to_sql("SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN", conn, if_exists="append", index=False, method=psql_insert_copy)
+                    
                     total_aux += len(chunk_aux)
+                    # Progresso de 70% a 95%
+                    prog = 70
+                    if total_linhas_aux > 0:
+                        prog = int(70 + (total_aux / total_linhas_aux) * 25)
+                    
+                    self.update_state(state='PROGRESS', meta={
+                        'progresso': min(prog, 95), 
+                        'mensagem': f'Arquivo Auxiliar: {total_aux:,} de {total_linhas_aux:,} registros...'.replace(',', '.')
+                    })
         else:
             self.update_state(state='PROGRESS', meta={'progresso': 90, 'mensagem': 'Arquivo auxiliar não fornecido, pulando...'})
 
-        # 4. Limpeza final de órfãos (apenas se houver arquivo auxiliar para limpar)
-        if total_aux > 0:
-            self.update_state(state='PROGRESS', meta={'progresso': 95, 'mensagem': 'Finalizando integridade...'})
-            with engine.begin() as conn:
-                conn.execute(text("""
-                    DELETE FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" t
-                    WHERE NOT EXISTS (SELECT 1 FROM "SIA_LANCIPTU_ASG" s WHERE s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG")
-                """))
+        # 4. Limpeza final de órfãos
+        self.update_state(state='PROGRESS', meta={'progresso': 96, 'mensagem': 'Finalizando integridade da base...'})
+        with engine.begin() as conn:
+            conn.execute(text("""
+                DELETE FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" t
+                WHERE NOT EXISTS (SELECT 1 FROM "SIA_LANCIPTU_ASG" s WHERE s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG")
+            """))
 
         # Limpar arquivos temporários apenas se estiverem na pasta de uploads
         # Não removemos se estiverem no volume persistente da VPS (/data)
