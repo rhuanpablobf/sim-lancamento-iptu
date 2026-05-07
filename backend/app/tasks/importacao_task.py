@@ -130,9 +130,16 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
                     WHERE NOT EXISTS (SELECT 1 FROM "SIA_LANCIPTU_ASG" s WHERE s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG")
                 """))
 
-        # Limpar arquivos temporários
-        if os.path.exists(path_principal): os.remove(path_principal)
-        if path_auxiliar and os.path.exists(path_auxiliar): os.remove(path_auxiliar)
+        # Limpar arquivos temporários apenas se estiverem na pasta de uploads
+        # Não removemos se estiverem no volume persistente da VPS (/data)
+        upload_dir = "uploads"
+        if os.path.exists(path_principal) and upload_dir in path_principal:
+            os.remove(path_principal)
+            logger.info(f"Arquivo temporário removido: {path_principal}")
+            
+        if path_auxiliar and os.path.exists(path_auxiliar) and upload_dir in path_auxiliar:
+            os.remove(path_auxiliar)
+            logger.info(f"Arquivo temporário removido: {path_auxiliar}")
         
         return {
             "status": "CONCLUIDO",
@@ -143,7 +150,10 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
         
     except Exception as e:
         logger.error(f"Erro na task de importação: {str(e)}")
-        if path_principal and os.path.exists(path_principal): os.remove(path_principal)
-        if path_auxiliar and os.path.exists(path_auxiliar): os.remove(path_auxiliar)
+        upload_dir = "uploads"
+        if path_principal and os.path.exists(path_principal) and upload_dir in path_principal:
+            os.remove(path_principal)
+        if path_auxiliar and os.path.exists(path_auxiliar) and upload_dir in path_auxiliar:
+            os.remove(path_auxiliar)
         self.update_state(state='FAILURE', meta={'mensagem': str(e)})
         raise e
