@@ -390,6 +390,8 @@ def executar_motor_completo(
             }
         )
         df_insert["simulacao_id"] = simulacao_id
+        # Gerar UUIDs no Python pois o COPY ignora os defaults do SQLAlchemy
+        df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
 
         # Atualizar progresso parcial (Cálculo concluído, iniciando salvamento)
         atualizar_progresso(
