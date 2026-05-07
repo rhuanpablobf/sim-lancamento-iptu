@@ -159,8 +159,16 @@ async def consultar_status(task_id: str):
             "status": status,
             "progresso": progresso,
             "mensagem": mensagem,
-
-# --- Manter os outros endpoints (excluir, status, dashboard) ---
+            "detalhes": detalhes
+        })
+    except Exception as e:
+        return RespostaPadrao(dados={
+            "id": task_id,
+            "status": "PENDING",
+            "progresso": 0,
+            "mensagem": f"Erro ao consultar: {str(e)}",
+            "detalhes": {}
+        })
 # (Eu vou manter os outros endpoints que já existiam mas vou simplificar o arquivo para focar no novo fluxo)
 # Na verdade, vou fazer um merge cuidadoso.
 
