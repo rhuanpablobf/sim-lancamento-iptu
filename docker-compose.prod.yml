@@ -10,24 +10,36 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - net
 
   backend:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
     container_name: iptu_backend
     restart: always
-    ports:
-      - "8000:8000"
     environment:
-      # AJUSTE O HOST ABAIXO (atualmente localhost ou IP da VPS)
-      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@10.0.1.177:5432/lancamento-iptu
+      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@postgres_db:5432/lancamento-iptu
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
     volumes:
       - /opt/dados_iptu:/data
+    networks:
+      - net
     depends_on:
       - redis
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=net"
+        - "traefik.http.routers.laniptu-api-v5.rule=Host(`api-laniptu.geredados.com.br`)"
+        - "traefik.http.routers.laniptu-api-v5.entrypoints=websecure"
+        - "traefik.http.routers.laniptu-api-v5.tls=true"
+        - "traefik.http.routers.laniptu-api-v5.tls.certresolver=myresolver"
+        - "traefik.http.services.laniptu-api-v5.loadbalancer.server.port=8000"
+        - "traefik.http.middlewares.laniptu-no-buffer.buffering.maxRequestBodyBytes=0"
+        - "traefik.http.routers.laniptu-api-v5.middlewares=laniptu-no-buffer"
 
   worker:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-backend:latest
@@ -35,13 +47,15 @@ services:
     restart: always
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     environment:
-      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@10.0.1.177:5432/lancamento-iptu
+      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@postgres_db:5432/lancamento-iptu
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
     volumes:
       - /opt/dados_iptu:/data
+    networks:
+      - net
     depends_on:
       - redis
 
@@ -49,12 +63,23 @@ services:
     image: ghcr.io/rhuanpablobf/sim-lancamento-iptu-frontend:latest
     container_name: iptu_frontend
     restart: always
-    ports:
-      - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=https://api-laniptu.geredados.com.br
+    networks:
+      - net
     depends_on:
       - backend
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=net"
+        - "traefik.http.routers.laniptu-front-v5.rule=Host(`laniptu.geredados.com.br`)"
+        - "traefik.http.routers.laniptu-front-v5.entrypoints=websecure"
+        - "traefik.http.routers.laniptu-front-v5.tls=true"
+        - "traefik.http.routers.laniptu-front-v5.tls.certresolver=myresolver"
+        - "traefik.http.services.laniptu-front-v5.loadbalancer.server.port=3000"
 
-volumes:
-  postgres_data:
+networks:
+  net:
+    external: true
+
