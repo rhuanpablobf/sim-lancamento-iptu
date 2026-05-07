@@ -39,6 +39,24 @@ async def detectar_vps():
     
     return RespostaPadrao(dados=status)
 
+@router.get("/debug-vps", summary="Diagnóstico de arquivos no volume")
+async def debug_vps():
+    """Lista todos os arquivos presentes na pasta de dados para debug."""
+    try:
+        if not os.path.exists(DATA_DIR_VPS):
+            return {"erro": f"Pasta {DATA_DIR_VPS} não existe no container."}
+        
+        arquivos = os.listdir(DATA_DIR_VPS)
+        return {
+            "caminho_configurado": DATA_DIR_VPS,
+            "existe": True,
+            "total_arquivos": len(arquivos),
+            "arquivos_encontrados": arquivos,
+            "env_data_path": os.getenv("DATA_PATH")
+        }
+    except Exception as e:
+        return {"erro": str(e)}
+
 @router.post("/processar-vps", summary="Processar arquivos que já estão na VPS")
 async def processar_vps(
     modo: str = Form(default="substituir"),
