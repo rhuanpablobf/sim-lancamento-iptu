@@ -78,7 +78,9 @@ export default function ImportacaoPage() {
       });
 
       if (resp.dados?.task_id) {
-        monitorarTask(resp.dados.task_id);
+        const tId = resp.dados.task_id;
+        setTaskId(tId);
+        localStorage.setItem('iptu_import_task_id', tId);
       }
     } catch (err) {
       setErro("Falha ao iniciar processamento local.");
@@ -119,7 +121,8 @@ export default function ImportacaoPage() {
           setFase("processamento");
           setProgresso(0);
           setMensagemStatus("Consolidando registros no banco...");
-          monitorarTask(taskId);
+          setTaskId(taskId);
+          localStorage.setItem('iptu_import_task_id', taskId);
         }
       } else {
         setErro("Falha no envio dos arquivos.");

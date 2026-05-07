@@ -73,10 +73,21 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
         df_anos = pd.read_csv(path_principal, sep=";", usecols=["CODG_EXERCICIO_LAN"], encoding="utf-8")
         anos = df_anos["CODG_EXERCICIO_LAN"].dropna().unique().tolist()
         
-        if modo == "substituir" and anos:
+        if (modo == "substituir" or modo == "tudo") and anos:
             self.update_state(state='PROGRESS', meta={'progresso': 10, 'mensagem': 'Limpando dados antigos...'})
             with engine.begin() as conn:
                 for ano in anos:
+                    # 1. Limpar auxiliar primeiro (por segurança, embora o delete orfãos devesse resolver)
+                    # Mas como não tem FK Cascade, limpamos manualmente registros associados aos anos da principal
+                    conn.execute(text("""
+                        DELETE FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" 
+                        WHERE "ISN_SIA_LANCIPTU_ASG" IN (
+                            SELECT "ISN_SIA_LANCIPTU_ASG" FROM "SIA_LANCIPTU_ASG" 
+                            WHERE "CODG_EXERCICIO_LAN" = :ano
+                        )
+                    """), {"ano": int(ano)})
+                    
+                    # 2. Limpar principal
                     conn.execute(text('DELETE FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" = :ano'), {"ano": int(ano)})
 
         # 2. Processar e Inserir o arquivo Principal em Chunks
