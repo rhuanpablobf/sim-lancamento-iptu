@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-import { Sidebar } from "./components/Sidebar";
+import { LayoutWrapper } from "./components/LayoutWrapper";
 
 /* Carrega IBM Plex Sans/Mono do Google Fonts */
 const ibmPlexSans = IBM_Plex_Sans({
@@ -36,10 +36,9 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-ibm-plex-sans, 'IBM Plex Sans', sans-serif)" }}
         suppressHydrationWarning
       >
-        <Sidebar />
-        <main className="main">
+        <LayoutWrapper>
           {children}
-        </main>
+        </LayoutWrapper>
       </body>
     </html>
   );

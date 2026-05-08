@@ -122,7 +122,13 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
 
         {/* Pontos e Rótulos */}
         {points.map((p: any, i: number) => {
-          const isAtivo = anoAtivo === p[labelKey];
+          const val = p[valorKey] || 0;
+          let variacao = null;
+          if (i > 0) {
+            const ant = points[i-1][valorKey] || 0;
+            if (ant > 0) variacao = ((val - ant) / ant) * 100;
+          }
+
           return (
             <g key={i}>
               <circle 
@@ -134,6 +140,19 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
                 strokeWidth="2" 
                 style={{ cursor: "pointer", transition: "all 0.2s" }}
               />
+              {/* Variação % acima do ponto */}
+              {variacao !== null && (
+                <text 
+                  x={p.x} 
+                  y={p.y - 28} 
+                  textAnchor="middle" 
+                  fontSize="10" 
+                  fontWeight="700" 
+                  fill={variacao > 0 ? "var(--green)" : variacao < 0 ? "var(--red)" : "var(--txt-4)"}
+                >
+                  {variacao > 0 ? `↑${variacao.toFixed(1)}%` : variacao < 0 ? `↓${Math.abs(variacao).toFixed(1)}%` : "0%"}
+                </text>
+              )}
               <text 
                 x={p.x} 
                 y={p.y - 12} 
@@ -143,7 +162,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
                 fill="var(--txt-1)"
                 style={{ opacity: 0.9 }}
               >
-                {moeda ? `R$ ${(p[valorKey] / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : fmtNum(p[valorKey])}
+                {moeda ? `R$ ${(val / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 1 })}M` : fmtNum(val)}
               </text>
               <text 
                 x={p.x} 
