@@ -348,6 +348,7 @@ def dashboard_simulacao(
         "volume_historico": db.execute(text("""
             WITH hist AS (
                 SELECT "CODG_EXERCICIO_LAN" AS ex,
+                       COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" IS NULL OR "TIPO_LANCAMENTO_LAN" = 0 OR "TIPO_LANCAMENTO_LAN" = 2) AS trib,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS soc,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imu,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2) AS ise,
@@ -363,7 +364,11 @@ def dashboard_simulacao(
                        COUNT(*) FILTER (WHERE tipo_lancamento = 2) AS min
                 FROM sim_lancamentos WHERE simulacao_id = :sid GROUP BY 1
             ),
-            todos AS (SELECT * FROM hist UNION SELECT * FROM sim)
+            todos AS (
+                SELECT ex, trib, soc, imu, ise, min FROM hist
+                UNION ALL
+                SELECT ex, trib, soc, imu, ise, min FROM sim
+            )
             SELECT ex AS exercicio, trib AS tributados, (trib - min) AS normal, soc AS social, ise AS isentos, imu AS imunes, min AS minimo FROM todos ORDER BY 1
         """), {"sid": str(simulacao_id)}).mappings().all()
     })
