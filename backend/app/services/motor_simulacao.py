@@ -403,8 +403,7 @@ def executar_motor_completo(
             df_insert["simulacao_id"] = simulacao_id
             df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
 
-            # Salvamento otimizado
-            from app.services.motor_simulacao import psql_insert_copy
+            # Salvamento otimizado (Usa a função global psql_insert_copy)
             df_insert.to_sql("sim_lancamentos", db.bind, if_exists="append", index=False, method=psql_insert_copy)
 
             # Preparar base para o próximo ano da simulação deste lote
@@ -438,3 +437,31 @@ def executar_motor_completo(
         )
 
     atualizar_progresso(status="CONCLUIDO", exercicios_concluidos=exercicios_concluidos)
+
+
+def psql_insert_copy(table, conn, keys, data_iter):
+    """
+    Método de inserção ultra-rápido usando o comando COPY do PostgreSQL.
+    """
+    import csv
+    from io import StringIO
+    
+    # Preparar buffer em memória
+    s_buf = StringIO()
+    writer = csv.writer(s_buf)
+    writer.writerows(data_iter)
+    s_buf.seek(0)
+    
+    columns = ', '.join([f'"{k}"' for k in keys])
+    table_name = table.name
+    if table.schema:
+        table_name = f'"{table.schema}"."{table_name}"'
+    else:
+        table_name = f'"{table_name}"'
+        
+    sql = f'COPY {table_name} ({columns}) FROM STDIN WITH CSV'
+    
+    # Obter a conexão bruta do driver (psycopg2)
+    dbapi_conn = conn.connection
+    with dbapi_conn.cursor() as cur:
+        cur.copy_expert(sql=sql, file=s_buf)
