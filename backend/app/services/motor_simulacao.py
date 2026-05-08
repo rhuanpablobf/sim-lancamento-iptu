@@ -297,6 +297,12 @@ def executar_motor_completo(
     """
     Ponto de entrada do motor. Processa os imóveis em LOTES (Chunks) para economizar RAM.
     """
+    from app.models import Simulacao
+    
+    sim = db.query(Simulacao).filter(Simulacao.id == uuid.UUID(simulacao_id)).first()
+    if not sim:
+        raise ValueError(f"Simulação {simulacao_id} não encontrada.")
+
     inicio_total = time.time()
 
     # 1. Contagem Total de Imóveis (Rápido)
