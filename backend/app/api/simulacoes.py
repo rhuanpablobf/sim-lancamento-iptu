@@ -264,7 +264,7 @@ def dashboard_simulacao(
     ).mappings().one()
 
     # Categorias (Simulado - Precisamos do JOIN para saber se é Residencial/Territorial)
-    categorias = db.execute(text("""
+    categorias = [dict(row) for row in db.execute(text("""
         SELECT CASE WHEN b."TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
                     WHEN b."INFO_USO_LAN" = '1' THEN 'Residencial'
                     ELSE 'Não Residencial' END AS categoria,
@@ -275,21 +275,21 @@ def dashboard_simulacao(
         JOIN "SIA_LANCIPTU_ASG" b ON s.isn_sia_lanciptu_asg = b."ISN_SIA_LANCIPTU_ASG"
         WHERE s.simulacao_id = :sid AND s.codg_exercicio_lan = :ano
         GROUP BY 1 ORDER BY total DESC
-    """), {"sid": str(simulacao_id), "ano": exercicio}).mappings().all()
+    """), {"sid": str(simulacao_id), "ano": exercicio}).mappings()]
 
     # Faixas (Simulado)
-    faixas = db.execute(
+    faixas = [dict(row) for row in db.execute(
         text("""
             SELECT s.faixa_atual AS faixa_codigo,
                    COUNT(*) AS total,
                    COALESCE(SUM(s.valr_venal_simulado), 0) AS venal_total,
                    COALESCE(SUM(s.valr_imposto_final), 0) AS imposto_total
-            FROM sim_lancamentos s
-            WHERE s.simulacao_id = :sid AND s.codg_exercicio_lan = :ano
-            GROUP BY 1 ORDER BY 1
-        """),
+        FROM sim_lancamentos s
+        WHERE s.simulacao_id = :sid AND s.codg_exercicio_lan = :ano
+        GROUP BY 1 ORDER BY 1
+    """),
         {"sid": str(simulacao_id), "ano": exercicio},
-    ).mappings().all()
+    ).mappings()]
 
     # Buscar parâmetros aplicados neste exercício da simulação
     from app.models import SimulacaoParametroUtilizado
@@ -311,29 +311,33 @@ def dashboard_simulacao(
             "valr_venal_total": kpis["valr_venal_base"],
             "valr_imposto_total": kpis["valr_imposto_base"]
         },
-        "categorias": [dict(r) for r in categorias],
-        "faixas": [dict(r) for r in faixas],
-        "iptu_social_historico": db.execute(text("""
+        "categorias": categorias,
+        "faixas": faixas,
+        "evolução_social": [dict(row) for row in db.execute(text("""
             WITH hist AS (
-                SELECT "CODG_EXERCICIO_LAN" AS ex, COUNT(*) AS qtd
-                FROM "SIA_LANCIPTU_ASG" 
-                WHERE ("TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL))
+                SELECT "CODG_EXERCICIO_LAN" AS ex,
+                       COUNT(*) AS qtd
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)
                 GROUP BY 1
             ),
             sim AS (
-                SELECT codg_exercicio_lan AS ex, COUNT(*) AS qtd
-                FROM sim_lancamentos WHERE simulacao_id = :sid AND tipo_lancamento = 3 GROUP BY 1
+                SELECT codg_exercicio_lan AS ex,
+                       COUNT(*) AS qtd
+                FROM sim_lancamentos WHERE simulacao_id = :sid AND tipo_lancamento = 3
+                GROUP BY 1
             ),
-            todos AS (SELECT ex, qtd FROM hist UNION SELECT ex, qtd FROM sim),
+            todos AS (SELECT * FROM hist UNION SELECT * FROM sim),
             params AS (
-                SELECT exercicio, limite_venal_social FROM sim_simulacao_parametros_utilizados WHERE simulacao_id = :sid
+                SELECT exercicio, limite_venal_social FROM "SIA_LANCIPTU_ASG_PARAMS_SIM"
+                WHERE simulacao_id = :sid
             )
             SELECT t.ex AS exercicio, t.qtd AS quantidade, COALESCE(p.limite_venal_social, 0) AS limite_vigente
             FROM todos t
             LEFT JOIN params p ON t.ex = p.exercicio
             ORDER BY 1
-        """), {"sid": str(simulacao_id)}).mappings().all(),
-        "arrecadacao_historica": db.execute(text("""
+        """), {"sid": str(simulacao_id)}).mappings()],
+        "arrecadacao_historica": [dict(row) for row in db.execute(text("""
             WITH hist AS (
                 SELECT "CODG_EXERCICIO_LAN" AS ex, SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)) AS val, COUNT(*) AS imov
                 FROM "SIA_LANCIPTU_ASG" GROUP BY 1
@@ -344,8 +348,8 @@ def dashboard_simulacao(
             ),
             todos AS (SELECT ex, val, imov FROM hist UNION SELECT ex, val, imov FROM sim)
             SELECT ex AS exercicio, CAST(val AS FLOAT) AS valor, imov AS imoveis FROM todos ORDER BY 1
-        """), {"sid": str(simulacao_id)}).mappings().all(),
-        "volume_historico": db.execute(text("""
+        """), {"sid": str(simulacao_id)}).mappings()],
+        "volume_historico": [dict(row) for row in db.execute(text("""
             WITH hist AS (
                 SELECT "CODG_EXERCICIO_LAN" AS ex,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" IS NULL OR "TIPO_LANCAMENTO_LAN" = 0 OR "TIPO_LANCAMENTO_LAN" = 2) AS trib,
@@ -370,7 +374,7 @@ def dashboard_simulacao(
                 SELECT ex, trib, soc, imu, ise, min FROM sim
             )
             SELECT ex AS exercicio, trib AS tributados, (trib - min) AS normal, soc AS social, ise AS isentos, imu AS imunes, min AS minimo FROM todos ORDER BY 1
-        """), {"sid": str(simulacao_id)}).mappings().all()
+        """), {"sid": str(simulacao_id)}).mappings()]
     })
 
 
