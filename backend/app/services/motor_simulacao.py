@@ -313,148 +313,148 @@ def executar_motor_completo(
     dict_counts = df_counts.set_index("INFO_CPF_CGC_LAN")["total_imoveis_cpf"].to_dict()
     del df_counts # Limpa RAM
 
-    # 3. Processamento em LOTES (Chunks)
-    CHUNK_SIZE = 100000
+    # 3. Carregamento ÚNICO da base (Super Rápido)
+    print(f"Carregando base total de {total_imoveis} imóveis...")
+    df_base_total = pd.read_sql(f"""
+        SELECT t1.*, t2."INFO_TIPO_EDF_LAN"
+        FROM "SIA_LANCIPTU_ASG" t1
+        LEFT JOIN (
+            SELECT "ISN_SIA_LANCIPTU_ASG", MIN("INFO_TIPO_EDF_LAN") as "INFO_TIPO_EDF_LAN"
+            FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
+            GROUP BY "ISN_SIA_LANCIPTU_ASG"
+        ) t2 ON t1."ISN_SIA_LANCIPTU_ASG" = t2."ISN_SIA_LANCIPTU_ASG"
+        WHERE t1."CODG_EXERCICIO_LAN" = {exercicio_base}
+          AND (t1."INFO_STATUS_LAN" IS NULL OR t1."INFO_STATUS_LAN" = '1')
+        ORDER BY t1."ISN_SIA_LANCIPTU_ASG"
+    """, db.bind)
+
+    if df_base_total.empty:
+        raise Exception("Nenhum imóvel ativo encontrado para processar.")
+
+    df_base_total.columns = [c.upper() for c in df_base_total.columns]
+    df_base_total = df_base_total.loc[:, ~df_base_total.columns.duplicated()].copy()
+    df_base_total = df_base_total.reset_index(drop=True)
+
+    # Injetar contagens globais
+    df_base_total["total_imoveis_cpf"] = df_base_total["INFO_CPF_CGC_LAN"].map(dict_counts).fillna(0)
+    del dict_counts # Limpa RAM
+
+    # Pré-processamento social (regras que dependem do edifício)
+    df_base_total = _preprocessar_regras_sociais(df_base_total)
+
+    # 4. Definir Categoria de Tributação
+    condicoes_cat = [
+        df_base_total["TIPO_IMPOSTO_LAN"] == 2,
+        (df_base_total["TIPO_IMPOSTO_LAN"] == 1) & (df_base_total["INFO_USO_LAN"] == 1),
+        (df_base_total["TIPO_IMPOSTO_LAN"] == 1) & (df_base_total["INFO_USO_LAN"] != 1),
+    ]
+    escolhas_cat = ["TERRITORIAL", "RESIDENCIAL", "NAO_RESIDENCIAL"]
+    df_base_total["categoria_tributacao"] = np.select(condicoes_cat, escolhas_cat, default="RESIDENCIAL")
+
+    # 5. Loop por ANO (Processamento Total)
     exercicios_concluidos = []
-    
-    # Preparar estatísticas consolidadas por ano
-    stats_por_ano = {ano: {"total": 0, "iptu_social": 0, "imposto_minimo": 0} 
-                    for ano in range(exercicio_base + 1, exercicio_destino + 1)}
+    df_corrente = df_base_total.copy()
+    faixas_ref = faixas_por_ano.get(exercicio_base, [])
 
-    for offset in range(0, total_imoveis, CHUNK_SIZE):
-        print(f"Processando lote {offset} até {offset + CHUNK_SIZE}...")
+    for ano in range(exercicio_base + 1, exercicio_destino + 1):
+        import time
+        start_time = time.time()
+        print(f"--- Processando Exercício {ano} (Total: {len(df_corrente)} imóveis) ---")
         
-        # Carregar pedaço da base
-        df_lote_base = pd.read_sql(f"""
-            SELECT t1.*, t2."INFO_TIPO_EDF_LAN"
-            FROM "SIA_LANCIPTU_ASG" t1
-            LEFT JOIN (
-                SELECT "ISN_SIA_LANCIPTU_ASG", MIN("INFO_TIPO_EDF_LAN") as "INFO_TIPO_EDF_LAN"
-                FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
-                GROUP BY "ISN_SIA_LANCIPTU_ASG"
-            ) t2 ON t1."ISN_SIA_LANCIPTU_ASG" = t2."ISN_SIA_LANCIPTU_ASG"
-            WHERE t1."CODG_EXERCICIO_LAN" = {exercicio_base}
-              AND (t1."INFO_STATUS_LAN" IS NULL OR t1."INFO_STATUS_LAN" = '1')
-            ORDER BY t1."ISN_SIA_LANCIPTU_ASG"
-            LIMIT {CHUNK_SIZE} OFFSET {offset}
-        """, db.bind)
-
-        if df_lote_base.empty:
-            break
-
-        df_lote_base.columns = [c.upper() for c in df_lote_base.columns]
-        df_lote_base = df_lote_base.loc[:, ~df_lote_base.columns.duplicated()].copy()
-        df_lote_base = df_lote_base.reset_index(drop=True)
-
-        # Injetar contagens globais no lote
-        df_lote_base["total_imoveis_cpf"] = df_lote_base["INFO_CPF_CGC_LAN"].map(dict_counts).fillna(0)
-        
-        # Pré-processamento social do lote (regras que dependem do edifício)
-        df_lote_base = _preprocessar_regras_sociais(df_lote_base)
-
-        # 4. Definir Categoria de Tributação (Residencial, Não Residencial, Territorial)
-        condicoes_cat = [
-            df_lote_base["TIPO_IMPOSTO_LAN"] == 2,
-            (df_lote_base["TIPO_IMPOSTO_LAN"] == 1) & (df_lote_base["INFO_USO_LAN"] == 1),
-            (df_lote_base["TIPO_IMPOSTO_LAN"] == 1) & (df_lote_base["INFO_USO_LAN"] != 1),
-        ]
-        escolhas_cat = ["TERRITORIAL", "RESIDENCIAL", "NAO_RESIDENCIAL"]
-        df_lote_base["categoria_tributacao"] = np.select(condicoes_cat, escolhas_cat, default="RESIDENCIAL")
-
-        df_lote_corrente = df_lote_base.copy()
-        faixas_correntes_ref = faixas_por_ano.get(exercicio_base, [])
-
-        # Processar todos os anos para este lote de imóveis
-        for ano in range(exercicio_base + 1, exercicio_destino + 1):
-            faixas_novo = faixas_por_ano.get(ano, [])
-            
-            df_resultado, valr_minimo, limite_social = simular_exercicio(
-                df_base=df_lote_corrente,
-                faixas_base=faixas_correntes_ref,
-                faixas_novo=faixas_novo,
-                parametros=parametros,
-                configs_base=configs_base,
-                ano=ano,
-                exercicio_base=exercicio_base,
-                indexador_social=indexador_social,
-                indexador_minimo=indexador_minimo,
-                aplicar_cap=aplicar_cap,
+        # Reportar progresso
+        if atualizar_progresso:
+            atualizar_progresso(
+                exercicio_atual=ano,
+                total_imoveis=len(df_corrente),
+                total_processados=0,
+                status="PROCESSANDO"
             )
 
-            # Acumular estatísticas
-            stats_por_ano[ano]["total"] += len(df_resultado)
-            stats_por_ano[ano]["iptu_social"] += int((df_resultado["tipo_lancamento"] == 3).sum())
-            stats_por_ano[ano]["imposto_minimo"] += int((df_resultado["tipo_lancamento"] == 2).sum())
-
-            # Preparar registros para inserção
-            df_insert = df_resultado[[
-                "ISN_SIA_LANCIPTU_ASG", "CODG_INSCRICAO_LAN", "codg_exercicio_lan",
-                "valr_venal_simulado", "valr_aliquota_calculada",
-                "valr_iptu_bruto", "valr_iptu_cap", "valr_imposto_final",
-                "tipo_lancamento", "faixa_anterior", "faixa_atual", "migrou_faixa",
-                "VALR_IMPOSTO_LAN", "VALR_VENAL_LAN"
-            ]].rename(columns={
-                "ISN_SIA_LANCIPTU_ASG": "isn_sia_lanciptu_asg",
-                "CODG_INSCRICAO_LAN": "codg_inscricao_lan",
-                "valr_aliquota_calculada": "valr_aliquota_simulada",
-                "VALR_IMPOSTO_LAN": "valr_imposto_anterior",
-                "VALR_VENAL_LAN": "valr_venal_base"
-            })
-            df_insert["simulacao_id"] = simulacao_id
-            df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
-
-            # 5. Salvar parâmetros utilizados para auditoria (UM POR ANO)
-            # Como estamos em chunks de imóveis, salvamos os parâmetros apenas na primeira vez que o ano é processado
-            if offset == 0:
-                from app.models import SimulacaoParametroUtilizado
-                param_audit = SimulacaoParametroUtilizado(
-                    simulacao_id=uuid.UUID(simulacao_id),
-                    exercicio=ano,
-                    valr_minimo_iptu=valr_minimo,
-                    limite_venal_social=limite_social,
-                    ipca_ano=parametros.get(ano, {}).get("ipca", 0),
-                    selic_ano=parametros.get(ano, {}).get("selic", 0),
-                    tipo_indice_social=indexador_social,
-                    tipo_indice_minimo=indexador_minimo,
-                    tipo_indice_faixa="SELIC" # Padronizado
-                )
-                db.add(param_audit)
-                db.commit()
-
-            # 6. Salvamento otimizado (Usa a função global psql_insert_copy)
-            df_insert.to_sql("sim_lancamentos", db.bind, if_exists="append", index=False, method=psql_insert_copy)
-
-            # Preparar base para o próximo ano da simulação deste lote
-            cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN"]
-            df_lote_corrente = df_resultado.drop(columns=[c for c in cols_base_antigas if c in df_resultado.columns])
-            df_lote_corrente = df_lote_corrente.rename(columns={
-                "valr_venal_simulado": "VALR_VENAL_LAN",
-                "valr_imposto_final": "VALR_IMPOSTO_LAN",
-                "valr_venal_social_simulado": "valr_venal_social_base"
-            }).reset_index(drop=True)
-            
-            cols_limpar = ["faixa_atual", "faixa_label", "valr_aliquota_calculada", "faixa_anterior", "migrou_faixa", "valr_venal_social_simulado"]
-            df_lote_corrente = df_lote_corrente.drop(columns=[c for c in cols_limpar if c in df_lote_corrente.columns])
-            faixas_correntes_ref = faixas_novo
-
-        # Atualizar progresso geral (após processar todos os anos para este lote)
-        processados_total_lote = offset + len(df_lote_base)
-        exercicios_concluidos = [
-            {
-                "exercicio": ano,
-                "total": stats["total"],
-                "iptu_social": stats["iptu_social"],
-                "imposto_minimo": stats["imposto_minimo"],
-                "tempo_segundos": 0 
-            }
-            for ano, stats in stats_por_ano.items() if stats["total"] > 0
-        ]
-        atualizar_progresso(
-            total_processados=processados_total_lote,
-            exercicios_concluidos=exercicios_concluidos
+        faixas_novo = faixas_por_ano.get(ano, [])
+        
+        df_resultado, valr_minimo, limite_social = simular_exercicio(
+            df_base=df_corrente,
+            faixas_base=faixas_ref,
+            faixas_novo=faixas_novo,
+            parametros=parametros,
+            configs_base=configs_base,
+            ano=ano,
+            exercicio_base=exercicio_base,
+            indexador_social=indexador_social,
+            indexador_minimo=indexador_minimo,
+            aplicar_cap=aplicar_cap,
         )
 
-    atualizar_progresso(status="CONCLUIDO", exercicios_concluidos=exercicios_concluidos)
+        # Salvar parâmetros de auditoria
+        from app.models import SimulacaoParametroUtilizado
+        param_audit = SimulacaoParametroUtilizado(
+            simulacao_id=uuid.UUID(simulacao_id),
+            exercicio=ano,
+            valr_minimo_iptu=valr_minimo,
+            limite_venal_social=limite_social,
+            ipca_ano=parametros.get(ano, {}).get("ipca", 0),
+            selic_ano=parametros.get(ano, {}).get("selic", 0),
+            tipo_indice_social=indexador_social,
+            tipo_indice_minimo=indexador_minimo,
+            tipo_indice_faixa="SELIC"
+        )
+        db.add(param_audit)
+        db.commit()
+
+        # 6. Salvamento Otimizado (COPY)
+        df_insert = df_resultado[[
+            "ISN_SIA_LANCIPTU_ASG", "CODG_INSCRICAO_LAN", "codg_exercicio_lan",
+            "valr_venal_simulado", "valr_aliquota_calculada",
+            "valr_iptu_bruto", "valr_iptu_cap", "valr_imposto_final",
+            "tipo_lancamento", "faixa_anterior", "faixa_atual", "migrou_faixa",
+            "VALR_IMPOSTO_LAN", "VALR_VENAL_LAN"
+        ]].rename(columns={
+            "ISN_SIA_LANCIPTU_ASG": "isn_sia_lanciptu_asg",
+            "CODG_INSCRICAO_LAN": "codg_inscricao_lan",
+            "valr_aliquota_calculada": "valr_aliquota_simulada",
+            "VALR_IMPOSTO_LAN": "valr_imposto_anterior",
+            "VALR_VENAL_LAN": "valr_venal_base"
+        })
+        df_insert["simulacao_id"] = simulacao_id
+        df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
+        
+        df_insert.to_sql("sim_lancamentos", db.bind, if_exists="append", index=False, method=psql_insert_copy)
+        
+        # Estatísticas para o progresso
+        tempo = round(time.time() - start_time, 2)
+        exercicios_concluidos.append({
+            "exercicio": ano,
+            "total": len(df_resultado),
+            "iptu_social": int((df_resultado["tipo_lancamento"] == 3).sum()),
+            "imposto_minimo": int((df_resultado["tipo_lancamento"] == 2).sum()),
+            "tempo_segundos": tempo
+        })
+        
+        if atualizar_progresso:
+            atualizar_progresso(exercicios_concluidos=exercicios_concluidos)
+
+        # Preparar base para o próximo ano e LIMPAR RAM
+        cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN"]
+        df_corrente = df_resultado.drop(columns=[c for c in cols_base_antigas if c in df_resultado.columns])
+        df_corrente = df_corrente.rename(columns={
+            "valr_venal_simulado": "VALR_VENAL_LAN",
+            "valr_imposto_final": "VALR_IMPOSTO_LAN",
+            "valr_venal_social_simulado": "valr_venal_social_base"
+        }).reset_index(drop=True)
+        
+        cols_limpar = ["faixa_atual", "faixa_label", "valr_aliquota_calculada", "faixa_anterior", "migrou_faixa", "valr_venal_social_simulado"]
+        df_corrente = df_corrente.drop(columns=[c for c in cols_limpar if c in df_corrente.columns])
+        faixas_ref = faixas_novo
+        
+        del df_resultado
+        del df_insert
+        import gc
+        gc.collect()
+
+    print("Simulação concluída com sucesso!")
+    if atualizar_progresso:
+        atualizar_progresso(status="CONCLUIDO", exercicios_concluidos=exercicios_concluidos)
+    return True
 
 
 def psql_insert_copy(table, conn, keys, data_iter):
