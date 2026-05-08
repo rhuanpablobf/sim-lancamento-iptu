@@ -229,10 +229,8 @@ def simular_exercicio(
     # ETAPA 6 — IPTU Social (Regra de Ouro)
     limite_social = _calcular_limite_iptu_social(parametros, configs_base, ano, indexador_social)
     
-    # O índice acumulado para fins de IPTU Social deve refletir a correção total desde o ano base original
-    # Usamos o valor venal atual (projetado) dividido pelo valor venal original (da base de cálculo)
-    # O valor de comparação para o IPTU Social (que pode ser a soma de Apto+Box) 
-    # deve ser corrigido pelo IPCA do ano para manter a paridade com o valor venal simulado.
+    # O valor de comparação para o IPTU Social deve ser corrigido pelo índice do ano
+    # para manter a paridade com o valor venal simulado.
     df["valr_venal_social_simulado"] = df["valr_venal_social_base"].astype(float) * (1 + ipca)
     valr_venal_comparacao_social = df["valr_venal_social_simulado"]
 
@@ -257,10 +255,26 @@ def simular_exercicio(
     df.loc[mask_social, "valr_imposto_final"] = 0.0
 
     # Classificação final do tipo de lançamento
-    df["tipo_lancamento"] = 0 # Normal
-    df.loc[df["valr_imposto_final"] == 0.0, "tipo_lancamento"] = 1 # Isento
-    df.loc[mask_social, "tipo_lancamento"] = 3 # IPTU Social
-    df.loc[mask_aplicar_minimo, "tipo_lancamento"] = 2 # Imposto Mínimo
+    # 0=Normal, 1=Isento, 2=Mínimo, 3=Social, 4=Imunidade
+    posicao = df["INFO_POSICAO_FISCAL_LAN"].fillna(0).astype(int)
+    
+    df["tipo_lancamento"] = 0 # Normal por padrão
+    
+    # Aplica Imunidade e Isenção de Origem (Posição Fiscal)
+    df.loc[posicao == 1, "tipo_lancamento"] = 4 # Imunidade
+    df.loc[posicao >= 2, "tipo_lancamento"] = 1 # Isento
+    
+    # Se já é Imune ou Isento por Posição Fiscal, o imposto deve ser zero
+    df.loc[df["tipo_lancamento"].isin([1, 4]), "valr_imposto_final"] = 0.0
+    
+    # Agora aplica as regras de negócio sobre quem sobrou (Normal)
+    # IPTU Social prevalece sobre Normal
+    df.loc[(df["tipo_lancamento"] == 0) & mask_social, "tipo_lancamento"] = 3
+    df.loc[df["tipo_lancamento"] == 3, "valr_imposto_final"] = 0.0
+    
+    # Imposto Mínimo prevalece sobre Normal (que não seja Social)
+    df.loc[(df["tipo_lancamento"] == 0) & mask_aplicar_minimo, "tipo_lancamento"] = 2
+    # O valor final já foi ajustado no mask_aplicar_minimo acima
 
     df["codg_exercicio_lan"] = ano
     # Garantir índice limpo no retorno
@@ -395,7 +409,7 @@ def executar_motor_completo(
             selic_ano=parametros.get(ano, {}).get("selic", 0),
             tipo_indice_social=indexador_social,
             tipo_indice_minimo=indexador_minimo,
-            tipo_indice_faixa="SELIC"
+            tipo_indice_faixa=sim.cenario
         )
         db.add(param_audit)
         db.commit()
@@ -421,6 +435,13 @@ def executar_motor_completo(
         
         # Estatísticas para o progresso
         tempo = round(time.time() - start_time, 2)
+        # PREPARAÇÃO PARA O PRÓXIMO ANO:
+        # O resultado deste ano vira a base para o cálculo do ano que vem (Acumulativo)
+        df_corrente = df_resultado.copy()
+        df_corrente["VALR_VENAL_LAN"] = df_resultado["valr_venal_simulado"]
+        df_corrente["VALR_IMPOSTO_LAN"] = df_resultado["valr_imposto_final"]
+        df_corrente["valr_venal_social_base"] = df_resultado["valr_venal_social_simulado"]
+        
         exercicios_concluidos.append({
             "exercicio": ano,
             "total": len(df_resultado),

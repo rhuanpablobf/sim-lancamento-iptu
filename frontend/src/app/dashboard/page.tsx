@@ -72,6 +72,97 @@ const variacao = (atual: number, anterior?: number, exercicioRef?: number | stri
   };
 };
 
+const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, moeda = false, anoAtivo = null }: any) => {
+  if (!dados || dados.length === 0) return <div className="table-empty">Sem dados para o gráfico</div>;
+
+  const padding = { top: 30, right: 40, bottom: 30, left: 40 };
+  const width = 600; // ViewBox width
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+
+  const maxVal = Math.max(...dados.map((d: any) => d[valorKey] || 0), 1) * 1.1;
+  const minVal = 0;
+
+  const points = dados.map((d: any, i: number) => {
+    const x = padding.left + (i / (dados.length - 1 || 1)) * chartWidth;
+    const y = height - padding.bottom - ((d[valorKey] - minVal) / (maxVal - minVal)) * chartHeight;
+    return { x, y, ...d };
+  });
+
+  const pathD = points.reduce((acc: string, p: any, i: number) => 
+    i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`, "");
+
+  return (
+    <div style={{ width: "100%", position: "relative" }}>
+      <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", overflow: "visible" }}>
+        {/* Linhas de Grade */}
+        {[0, 0.25, 0.5, 0.75, 1].map((p, i) => (
+          <line 
+            key={i} 
+            x1={padding.left} 
+            y1={height - padding.bottom - p * chartHeight} 
+            x2={width - padding.right} 
+            y2={height - padding.bottom - p * chartHeight} 
+            stroke="var(--border)" 
+            strokeWidth="1" 
+            strokeDasharray="4 4"
+          />
+        ))}
+
+        {/* Linha do Gráfico */}
+        <path 
+          d={pathD} 
+          fill="none" 
+          stroke="#0e4f66" 
+          strokeWidth="3" 
+          strokeLinecap="round" 
+          strokeLinejoin="round" 
+          style={{ transition: "all 0.3s" }}
+        />
+
+        {/* Pontos e Rótulos */}
+        {points.map((p: any, i: number) => {
+          const isAtivo = anoAtivo === p[labelKey];
+          return (
+            <g key={i}>
+              <circle 
+                cx={p.x} 
+                cy={p.y} 
+                r={isAtivo ? 6 : 4} 
+                fill={isAtivo ? "#0e4f66" : "#fff"} 
+                stroke="#0e4f66" 
+                strokeWidth="2" 
+                style={{ cursor: "pointer", transition: "all 0.2s" }}
+              />
+              <text 
+                x={p.x} 
+                y={p.y - 12} 
+                textAnchor="middle" 
+                fontSize="11" 
+                fontWeight="600" 
+                fill="var(--txt-1)"
+                style={{ opacity: 0.9 }}
+              >
+                {moeda ? `R$ ${(p[valorKey] / 1000000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : fmtNum(p[valorKey])}
+              </text>
+              <text 
+                x={p.x} 
+                y={height - 10} 
+                textAnchor="middle" 
+                fontSize="11" 
+                fontWeight={isAtivo ? "700" : "400"} 
+                fill={isAtivo ? "var(--txt-1)" : "var(--txt-4)"}
+              >
+                {p[labelKey]}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+};
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -131,6 +222,11 @@ export default function DashboardPage() {
     fetcher
   );
   const matrizEdf = respEdificacao?.dados || {};
+  const { data: respResumo } = useSWR(
+    contexto !== "base" ? `/api/simulacoes/${contexto}/resumo-consolidado` : null, 
+    fetcher
+  );
+  const resumoConsolidado = respResumo?.dados || [];
 
   const [anosVisiveis, setAnosVisiveis] = useState<number[]>([]);
 
@@ -219,6 +315,7 @@ export default function DashboardPage() {
     );
   };
 
+
   return (
     <div className="page active">
       <div className="page-header">
@@ -293,64 +390,100 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* grid-2: Evolução IPTU Social (esq) + Imposto Mínimo (dir) */}
-        <div className="grid-2 mt-16">
+        {/* Gráficos de Evolução */}
+        <div className="grid-3 mt-16">
           <div className="card">
             <div className="card-header">
-              <div className="card-title">Evolução do IPTU Social</div>
+              <div className="card-title">Lançamento (Milhões R$)</div>
+              <div className="badge badge-blue">Cofre</div>
             </div>
-            <div className="card-body-flush table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Exercício</th>
-                    <th className="right">Quantidade</th>
-                    <th className="right">Limite vigente</th>
-                    <th className="right">% do total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(d.iptu_social_historico || []).map((row: any) => (
-                    <tr key={row.exercicio}>
-                      <td>{row.exercicio}</td>
-                      <td className="right">{fmtNum(row.quantidade)}</td>
-                      <td className="right mono">{fmtMoeda(row.limite_vigente)}</td>
-                      <td className="right">{fmtPct(row.quantidade, kpis?.total_imoveis || 0)}</td>
-                    </tr>
-                  ))}
-                  <tr style={{ background: "var(--blue-light)" }}>
-                    <td><span className="badge badge-blue">{anoSelecionado || d?.exercicio_atual} ✦</span></td>
-                    <td className="right fw-500">{fmtNum(kpis?.iptu_social || 0)}</td>
-                    <td className="right mono fw-500">{fmtMoeda(kpis?.limite_social || 0)}</td>
-                    <td className="right fw-500">{fmtPct(kpis?.iptu_social || 0, kpis?.total_imoveis || 0)}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div className="card-body">
+              <LineChart 
+                dados={d?.arrecadacao_historica || []} 
+                valorKey="valor"
+                moeda={true} 
+                height={160}
+                anoAtivo={anoSelecionado}
+              />
             </div>
           </div>
 
           <div className="card">
             <div className="card-header">
-              <div className="card-title">Imposto mínimo</div>
-              <div className="badge badge-amber">Art. 179 CTM</div>
+              <div className="card-title">Normal (Qtd. Imóveis)</div>
+              <div className="badge badge-blue">Tributados</div>
             </div>
             <div className="card-body">
-              <div className="kpi-grid" style={{ gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: 0 }}>
-                <div className="kpi-card" style={{ padding: "12px 14px" }}>
-                  <div className="kpi-label">Quantidade</div>
-                  <div className="kpi-value" style={{ fontSize: "20px" }}>{fmtNum(kpis?.imposto_minimo || 0)}</div>
-                </div>
-                <div className="kpi-card" style={{ padding: "12px 14px" }}>
-                  <div className="kpi-label">Valor mínimo {anoSelecionado || d?.exercicio_atual}</div>
-                  <div className="kpi-value" style={{ fontSize: "18px", fontFamily: "var(--font-mono)" }}>{fmtMoeda(kpis?.valr_minimo || 0)}</div>
-                </div>
-              </div>
-              <div className="text-xs text-muted mt-12">
-                Valor base R$ 100,00 atualizado pelo indexador (SELIC/IPCA) acumulado.
-              </div>
+              <LineChart 
+                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.normal }))} 
+                valorKey="valor"
+                height={160}
+                anoAtivo={anoSelecionado}
+              />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">IPTU Social (Qtd. Imóveis)</div>
+              <div className="badge badge-green">Social</div>
+            </div>
+            <div className="card-body">
+              <LineChart 
+                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.social }))} 
+                valorKey="valor"
+                height={160}
+                anoAtivo={anoSelecionado}
+              />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Isentos (Qtd. Imóveis)</div>
+              <div className="badge badge-amber">Fiscal</div>
+            </div>
+            <div className="card-body">
+              <LineChart 
+                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.isentos }))} 
+                valorKey="valor"
+                height={160}
+                anoAtivo={anoSelecionado}
+              />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Imunes (Qtd. Imóveis)</div>
+              <div className="badge badge-purple">Fiscal</div>
+            </div>
+            <div className="card-body">
+              <LineChart 
+                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.imunes }))} 
+                valorKey="valor"
+                height={160}
+                anoAtivo={anoSelecionado}
+              />
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="card-header">
+              <div className="card-title">Imposto Mínimo (Qtd. Imóveis)</div>
+              <div className="badge badge-red">Tributados</div>
+            </div>
+            <div className="card-body">
+              <LineChart 
+                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.minimo }))} 
+                valorKey="valor"
+                height={160}
+                anoAtivo={anoSelecionado}
+              />
             </div>
           </div>
         </div>
+
 
         {/* Distribuição por faixa — sempre visível quando há dados */}
         {Object.keys(consolidado).length > 0 && (

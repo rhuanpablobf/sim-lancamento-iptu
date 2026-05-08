@@ -85,7 +85,14 @@
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `INFO_POSICAO_FISCAL_LAN` | N1,0 | Posição fiscal do imóvel na época do lançamento: `0` = Normal, `1` = Imunidade, `2` = Isento IPTU/Taxas, `3` = Isento de Contribuição de Melhoria, `4` = Isenção Total, `5` = Não Incidente |
+| `INFO_POSICAO_FISCAL_LAN` | N1,0 | Posição fiscal do imóvel: `1` = Imunidade, `2` = Isento IPTU/Taxas, `3` = Isento Contrib., `4` = Isenção Total, `5` = Não Incidente. |
+
+> **Regra de Classificação (Alinhamento Tableau 2022):**
+> - **IPTU Social**: `(TIPO_LANCAMENTO_LAN = 1 E INFO_POSICAO_FISCAL_LAN IS NULL)` OU `TIPO_LANCAMENTO_LAN = 3`
+> - **Imune**: `TIPO_LANCAMENTO_LAN = 1 E INFO_POSICAO_FISCAL_LAN = 1`
+> - **Isento**: `TIPO_LANCAMENTO_LAN = 1 E INFO_POSICAO_FISCAL_LAN >= 2`
+> - **Imposto Mínimo**: `TIPO_LANCAMENTO_LAN = 2`
+> - **Normal**: `TIPO_LANCAMENTO_LAN = 0` OU `NULL`
 | `QTDE_AREA_TERRENO_LAN` | P8,2 | Área do terreno onde se situa o imóvel |
 | `QTDE_AREA_EDIFICADA_LAN` | P7,2 | Área edificada do imóvel na época do lançamento |
 | `NUMR_FRACAO_IDEAL_LAN` | P3,5 | Fração ideal do terreno calculada para os sublotes |

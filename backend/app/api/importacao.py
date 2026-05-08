@@ -203,10 +203,11 @@ def status_importacao(db: Session = Depends(obter_sessao)):
     try:
         resultado = db.execute(text("""
             SELECT "CODG_EXERCICIO_LAN" AS exercicio, COUNT(*) AS total,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 0) AS normal,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1) AS isento,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3) AS iptu_social,
+                    COUNT(*) FILTER (WHERE ("TIPO_LANCAMENTO_LAN" = 0 OR "TIPO_LANCAMENTO_LAN" IS NULL)) AS normal,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2) AS isento,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS iptu_social,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imune,
                    COALESCE(SUM(CAST("VALR_VENAL_LAN" AS NUMERIC)), 0) AS valr_venal_total,
                    COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valr_imposto_total
             FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
@@ -246,9 +247,10 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             ex = row_exercicio["max_ex"]
         kpis = db.execute(text("""
             SELECT COUNT(*) AS total_imoveis,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1) AS isentos,
+                   COUNT(*) FILTER (WHERE ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2)) AS isentos,
                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
-                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3) AS iptu_social,
+                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS iptu_social,
+                   COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imunes,
                    COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = 1) AS predial,
                    COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = 2) AS territorial,
                    COALESCE(SUM(CAST("VALR_VENAL_LAN" AS NUMERIC)), 0) AS valr_venal_total,
@@ -320,6 +322,51 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             idx = params_periodo.get(a, 0.0)
             v_soc *= (1 + idx / 100.0)
 
+        # --- SÉRIES HISTÓRICAS PARA GRÁFICOS ---
+        
+        # 1. Arrecadação e Volume Geral
+        historico_geral = db.execute(text("""
+            SELECT 
+                "CODG_EXERCICIO_LAN" AS exercicio,
+                COUNT(*) AS total_imoveis,
+                COUNT(*) FILTER (WHERE ("TIPO_LANCAMENTO_LAN" = 0 OR "TIPO_LANCAMENTO_LAN" IS NULL)) AS normal,
+                COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS minimo,
+                COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS social,
+                COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imunes,
+                COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2) AS isentos,
+                COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valor_total
+            FROM "SIA_LANCIPTU_ASG"
+            WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
+            GROUP BY 1 ORDER BY 1
+        """)).mappings().all()
+
+        # 2. IPTU Social Histórico com limites projetados
+        # Pegamos os parâmetros de todos os anos para calcular os limites retroativamente/prospectivamente
+        todos_params = {
+            p.exercicio: float(p.ipca) 
+            for p in db.query(ParametroMacroeconomico).order_by(ParametroMacroeconomico.exercicio).all()
+        }
+        
+        iptu_social_serie = []
+        for h in historico_geral:
+            ano_h = int(h["exercicio"])
+            # Calcular limite social para este ano específico
+            lim_soc_h = float(config_soc.valor) if config_soc else LIM_SOC_BASE
+            ano_ref_h = config_soc.ano_referencia if config_soc else ANO_REF_DEFAULT
+            
+            if ano_h > ano_ref_h:
+                for a in range(ano_ref_h + 1, ano_h + 1):
+                    lim_soc_h *= (1 + todos_params.get(a, 0.0) / 100.0)
+            elif ano_h < ano_ref_h:
+                for a in range(ano_h + 1, ano_ref_h + 1):
+                    lim_soc_h /= (1 + todos_params.get(a, 0.0) / 100.0)
+            
+            iptu_social_serie.append({
+                "exercicio": ano_h,
+                "quantidade": h["social"],
+                "limite_vigente": round(lim_soc_h, 2)
+            })
+
         return RespostaPadrao(dados={
             "exercicio_atual": ex, "exercicio_anterior": ex - 1,
             "kpis": {
@@ -329,7 +376,24 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             }, 
             "kpis_anterior": dict(kpis_ant) if kpis_ant else None,
             "categorias": [dict(r) for r in categorias],
-            "faixas": [dict(r) for r in faixas]
+            "faixas": [dict(r) for r in faixas],
+            "iptu_social_historico": iptu_social_serie,
+            "arrecadacao_historica": [
+                {"exercicio": h["exercicio"], "valor": float(h["valor_total"]), "imoveis": h["total_imoveis"]} 
+                for h in historico_geral
+            ],
+            "volume_historico": [
+                {
+                    "exercicio": h["exercicio"], 
+                    "tributados": h["normal"] + h["minimo"],
+                    "normal": h["normal"],
+                    "minimo": h["minimo"],
+                    "social": h["social"],
+                    "isentos": h["isentos"],
+                    "imunes": h["imunes"]
+                } 
+                for h in historico_geral
+            ]
         })
     except Exception as e:
         return RespostaPadrao(dados={}, meta={"mensagem": str(e)})
@@ -479,7 +543,7 @@ def distribuicao_edificacao_base(exercicio: str = Query(None), db: Session = Dep
                     "ISN_SIA_LANCIPTU_ASG",
                     STRING_AGG(
                         CASE "INFO_TIPO_EDF_LAN"
-                            WHEN 1 THEN 'Casa/Sobrado'
+                            WHEN 1 THEN 'Casa'
                             WHEN 2 THEN 'Apartamento'
                             WHEN 3 THEN 'Barracão'
                             WHEN 4 THEN 'Loja'

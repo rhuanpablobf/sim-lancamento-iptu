@@ -115,41 +115,6 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
         </div>
       </div>
       
-      {paramsUtilizados.length > 0 && (
-        <div style={{ padding: "0 24px 20px 24px" }}>
-          <div className="card" style={{ borderTop: "none", borderRadius: "0 0 var(--radius) var(--radius)" }}>
-            <div className="card-body-flush table-wrap">
-              <table style={{ fontSize: "12px" }}>
-                <thead style={{ background: "var(--surface-2)" }}>
-                  <tr>
-                    <th style={{ padding: "8px 16px" }}>Exercício</th>
-                    <th className="right" style={{ padding: "8px 16px" }}>IPCA Aplicado</th>
-                    <th className="right" style={{ padding: "8px 16px" }}>SELIC Aplicado</th>
-                    <th className="right" style={{ padding: "8px 16px" }}>Valor Mínimo</th>
-                    <th className="right" style={{ padding: "8px 16px" }}>Limite Venal Social</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paramsUtilizados.map(p => (
-                    <tr key={p.exercicio}>
-                      <td className="fw-700" style={{ padding: "8px 16px" }}>{p.exercicio}</td>
-                      <td className="right" style={{ padding: "8px 16px" }}>
-                        <span className="badge badge-gray" style={{ fontSize: "10px" }}>{p.ipca_ano}%</span>
-                      </td>
-                      <td className="right" style={{ padding: "8px 16px" }}>
-                        <span className="badge badge-gray" style={{ fontSize: "10px" }}>{p.selic_ano}%</span>
-                      </td>
-                      <td className="right fw-600 text-mono" style={{ padding: "8px 16px" }}>{fmtMoeda(p.valr_minimo_iptu)}</td>
-                      <td className="right fw-600 text-mono" style={{ padding: "8px 16px", color: "var(--blue-txt)" }}>{fmtMoeda(p.limite_venal_social)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="page-content">
         <div className="row">
           <div style={{ flex: 1 }}>
@@ -207,81 +172,54 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
               </div>
             )}
 
-            {sim?.progresso_json && sim.progresso_json.length > 0 && (
-              <div className="card">
-                <div className="card-header"><div className="card-title">Consolidado por Exercício</div></div>
-                <div className="card-body-flush table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Exercício</th>
-                        <th className="right">Total Imóveis</th>
-                        <th className="right">IPTU Social</th>
-                        <th className="right">Imp. Mínimo</th>
-                        <th className="right">Tempo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sim.progresso_json.map(c => (
-                        <tr key={c.exercicio}>
-                          <td className="fw-600">{c.exercicio}</td>
-                          <td className="right text-mono">{c.total.toLocaleString("pt-BR")}</td>
-                          <td className="right"><span className="badge badge-blue">{c.iptu_social.toLocaleString("pt-BR")}</span></td>
-                          <td className="right"><span className="badge badge-amber">{c.imposto_minimo.toLocaleString("pt-BR")}</span></td>
-                          <td className="right text-muted">{c.tempo_segundos}s</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div style={{ flex: "0 0 320px" }}>
             <div className="card">
-              <div className="card-header"><div className="card-title">Auditoria de Regras</div></div>
-              <div className="card-body">
-                {paramsUtilizados.map((p, i) => (
-                  <div key={p.exercicio} style={{ marginTop: i > 0 ? "16px" : 0, paddingTop: i > 0 ? "16px" : 0, borderTop: i > 0 ? "1px solid var(--border)" : "none" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                      <span className="fw-700" style={{ color: "var(--blue-txt)", fontSize: "18px" }}>{p.exercicio}</span>
-                      <div style={{ display: "flex", gap: "4px" }}>
-                        <span className="badge badge-gray" style={{ fontSize: "10px" }}>IPCA: {p.ipca_ano}%</span>
-                        <span className="badge badge-gray" style={{ fontSize: "10px" }}>SELIC: {p.selic_ano}%</span>
-                      </div>
-                    </div>
-                    
-                    <div style={{ background: "rgba(0,0,0,0.02)", padding: "8px", borderRadius: "6px", marginBottom: "8px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>Projeção de Faixas</span>
-                        <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", border: "1px solid var(--border)", borderRadius: "4px", background: "white" }}>{p.tipo_indice_faixa ?? sim?.cenario}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ background: "rgba(0,0,0,0.02)", padding: "8px", borderRadius: "6px", marginBottom: "8px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>IPTU Social</span>
-                        <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", border: "1px solid var(--border)", borderRadius: "4px", background: "white" }}>{p.tipo_indice_social}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                        <span style={{ color: "var(--text-muted)" }}>Limite Venal</span>
-                        <span style={{ fontWeight: 600, fontFamily: "var(--font-mono)" }}>{fmtMoeda(p.limite_venal_social)}</span>
-                      </div>
-                    </div>
-
-                    <div style={{ background: "rgba(0,0,0,0.02)", padding: "8px", borderRadius: "6px" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                        <span style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase" }}>Imposto Mínimo</span>
-                        <span style={{ fontSize: "10px", fontWeight: 700, padding: "2px 6px", border: "1px solid var(--border)", borderRadius: "4px", background: "white" }}>{p.tipo_indice_minimo}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px" }}>
-                        <span style={{ color: "var(--text-muted)" }}>Valor Mínimo</span>
-                        <span style={{ fontWeight: 600, fontFamily: "var(--font-mono)" }}>{fmtMoeda(p.valr_minimo_iptu)}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className="card-header">
+                <div className="card-title">Auditoria de Regras e Parâmetros Aplicados</div>
+                <div className="card-subtitle">Confirmação de cenários macroeconômicos utilizados no motor de cálculo</div>
+              </div>
+              <div className="card-body-flush table-wrap">
+                <table className="table-clean">
+                  <thead>
+                    <tr>
+                      <th>Exercício</th>
+                      <th>Cenário Faixas</th>
+                      <th>Cenário Soc. / Mín.</th>
+                      <th className="right">IPCA Ano</th>
+                      <th className="right">SELIC Ano</th>
+                      <th className="right">Vlr. Mínimo</th>
+                      <th className="right">Lim. Social</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paramsUtilizados.map((p) => (
+                      <tr key={p.exercicio}>
+                        <td className="fw-700" style={{ color: "var(--blue-txt)", fontSize: "15px" }}>{p.exercicio}</td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                            <span className="text-xs fw-600 text-muted">PROJ. FAIXAS:</span>
+                            <span className={`badge ${p.tipo_indice_faixa === 'SELIC' ? 'badge-amber' : 'badge-blue'}`} style={{ fontSize: "10px" }}>{p.tipo_indice_faixa}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span className="text-xs fw-600 text-muted" style={{ width: "40px" }}>SOCIAL:</span>
+                              <span className={`badge ${p.tipo_indice_social === 'SELIC' ? 'badge-amber' : 'badge-blue'}`} style={{ fontSize: "10px" }}>{p.tipo_indice_social}</span>
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                              <span className="text-xs fw-600 text-muted" style={{ width: "40px" }}>MÍNIMO:</span>
+                              <span className={`badge ${p.tipo_indice_minimo === 'SELIC' ? 'badge-amber' : 'badge-blue'}`} style={{ fontSize: "10px" }}>{p.tipo_indice_minimo}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="right text-mono">{p.ipca_ano}%</td>
+                        <td className="right text-mono">{p.selic_ano}%</td>
+                        <td className="right fw-600">{fmtMoeda(p.valr_minimo_iptu)}</td>
+                        <td className="right fw-600" style={{ color: "var(--blue-txt)" }}>{fmtMoeda(p.limite_venal_social)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

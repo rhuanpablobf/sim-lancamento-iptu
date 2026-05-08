@@ -312,7 +312,60 @@ def dashboard_simulacao(
             "valr_imposto_total": kpis["valr_imposto_base"]
         },
         "categorias": [dict(r) for r in categorias],
-        "faixas": [dict(r) for r in faixas]
+        "faixas": [dict(r) for r in faixas],
+        "iptu_social_historico": db.execute(text("""
+            WITH hist AS (
+                SELECT "CODG_EXERCICIO_LAN" AS ex, COUNT(*) AS qtd
+                FROM "SIA_LANCIPTU_ASG" 
+                WHERE ("TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL))
+                GROUP BY 1
+            ),
+            sim AS (
+                SELECT codg_exercicio_lan AS ex, COUNT(*) AS qtd
+                FROM sim_lancamentos WHERE simulacao_id = :sid AND tipo_lancamento = 3 GROUP BY 1
+            ),
+            todos AS (SELECT ex, qtd FROM hist UNION SELECT ex, qtd FROM sim),
+            params AS (
+                SELECT exercicio, limite_venal_social FROM sim_simulacao_parametros_utilizados WHERE simulacao_id = :sid
+            )
+            SELECT t.ex AS exercicio, t.qtd AS quantidade, COALESCE(p.limite_venal_social, 0) AS limite_vigente
+            FROM todos t
+            LEFT JOIN params p ON t.ex = p.exercicio
+            ORDER BY 1
+        """), {"sid": str(simulacao_id)}).mappings().all(),
+        "arrecadacao_historica": db.execute(text("""
+            WITH hist AS (
+                SELECT "CODG_EXERCICIO_LAN" AS ex, SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)) AS val, COUNT(*) AS imov
+                FROM "SIA_LANCIPTU_ASG" GROUP BY 1
+            ),
+            sim AS (
+                SELECT codg_exercicio_lan AS ex, SUM(valr_imposto_final) AS val, COUNT(*) AS imov
+                FROM sim_lancamentos WHERE simulacao_id = :sid GROUP BY 1
+            ),
+            todos AS (SELECT ex, val, imov FROM hist UNION SELECT ex, val, imov FROM sim)
+            SELECT ex AS exercicio, CAST(val AS FLOAT) AS valor, imov AS imoveis FROM todos ORDER BY 1
+        """), {"sid": str(simulacao_id)}).mappings().all(),
+        "volume_historico": db.execute(text("""
+            WITH hist AS (
+                SELECT "CODG_EXERCICIO_LAN" AS ex,
+                       COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS soc,
+                       COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imu,
+                       COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2) AS ise,
+                       COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS min
+                FROM "SIA_LANCIPTU_ASG" GROUP BY 1
+            ),
+            sim AS (
+                SELECT codg_exercicio_lan AS ex,
+                       COUNT(*) FILTER (WHERE tipo_lancamento IN (0, 2)) AS trib,
+                       COUNT(*) FILTER (WHERE tipo_lancamento = 3) AS soc,
+                       COUNT(*) FILTER (WHERE tipo_lancamento = 4) AS imu,
+                       COUNT(*) FILTER (WHERE tipo_lancamento = 1) AS ise,
+                       COUNT(*) FILTER (WHERE tipo_lancamento = 2) AS min
+                FROM sim_lancamentos WHERE simulacao_id = :sid GROUP BY 1
+            ),
+            todos AS (SELECT * FROM hist UNION SELECT * FROM sim)
+            SELECT ex AS exercicio, trib AS tributados, (trib - min) AS normal, soc AS social, ise AS isentos, imu AS imunes, min AS minimo FROM todos ORDER BY 1
+        """), {"sid": str(simulacao_id)}).mappings().all()
     })
 
 
@@ -437,6 +490,57 @@ def consolidado_faixas(simulacao_id: UUID, db: Session = Depends(obter_sessao)) 
     inserir_no_mapa(simulado)
 
     return RespostaPadrao(dados=resultado)
+    
+@router.get("/{simulacao_id}/resumo-consolidado", summary="Resumo consolidado por exercício")
+def resumo_consolidado_exercicios(simulacao_id: UUID, db: Session = Depends(obter_sessao)) -> RespostaPadrao:
+    """
+    Retorna o resumo financeiro e de contagem por exercício.
+    Combina o exercício base (real) com as projeções simuladas.
+    """
+    from sqlalchemy import text
+    item = db.get(Simulacao, simulacao_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Simulação não encontrada.")
+
+    # 1. Dados da Base Real (Exercício Base da Simulação)
+    base_real = db.execute(text("""
+        SELECT 
+            "CODG_EXERCICIO_LAN" AS ano,
+            COUNT(*) AS total_imoveis,
+            COUNT(*) FILTER (WHERE COALESCE("INFO_POSICAO_FISCAL_LAN", 0) = 0 AND "INFO_STATUS_LAN" != '4') AS total_normal,
+            COUNT(*) FILTER (WHERE "INFO_STATUS_LAN" = '4') AS iptu_social,
+            COUNT(*) FILTER (WHERE "INFO_POSICAO_FISCAL_LAN" >= 2) AS total_isento,
+            COUNT(*) FILTER (WHERE "INFO_POSICAO_FISCAL_LAN" = 1) AS total_imune,
+            SUM("VALR_IMPOSTO_LAN") AS total_imposto
+        FROM "SIA_LANCIPTU_ASG"
+        WHERE "CODG_EXERCICIO_LAN" = :ano_base
+        GROUP BY 1
+    """), {"ano_base": item.exercicio_base}).mappings().one_or_none()
+
+    # 2. Dados Simulados
+    simulado = db.execute(text("""
+        SELECT 
+            codg_exercicio_lan AS ano,
+            COUNT(*) AS total_imoveis,
+            COUNT(*) FILTER (WHERE tipo_lancamento IN (0, 2)) AS total_normal,
+            COUNT(*) FILTER (WHERE tipo_lancamento = 3) AS iptu_social,
+            COUNT(*) FILTER (WHERE tipo_lancamento = 1) AS total_isento,
+            COUNT(*) FILTER (WHERE tipo_lancamento = 4) AS total_imune,
+            SUM(valr_imposto_final) AS total_imposto
+        FROM sim_lancamentos
+        WHERE simulacao_id = :sid
+        GROUP BY 1
+        ORDER BY 1
+    """), {"sid": str(simulacao_id)}).mappings().all()
+
+    resumo = []
+    if base_real:
+        resumo.append(dict(base_real))
+    
+    for r in simulado:
+        resumo.append(dict(r))
+
+    return RespostaPadrao(dados=resumo)
 
 @router.get("/{simulacao_id}/distribuicao-edificacao")
 def distribuicao_edificacao_sim(
@@ -452,7 +556,7 @@ def distribuicao_edificacao_sim(
                     "ISN_SIA_LANCIPTU_ASG",
                     STRING_AGG(
                         CASE "INFO_TIPO_EDF_LAN"
-                            WHEN 1 THEN 'Casa/Sobrado'
+                            WHEN 1 THEN 'Casa'
                             WHEN 2 THEN 'Apartamento'
                             WHEN 3 THEN 'Barracão'
                             WHEN 4 THEN 'Loja'
@@ -475,10 +579,17 @@ def distribuicao_edificacao_sim(
                 GROUP BY 1
             )
             SELECT 
-                COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
+                COALESCE(t.tipo_edificacao, 
+                    CASE l."INFO_USO_LAN"
+                        WHEN 1 THEN 'Residencial'
+                        WHEN 2 THEN 'Não Residencial'
+                        ELSE 'Territorial'
+                    END
+                ) AS tipo_edificacao,
                 s.tipo_lancamento,
                 COUNT(*) AS quantidade
             FROM sim_lancamentos s
+            JOIN "SIA_LANCIPTU_ASG" l ON s.isn_sia_lanciptu_asg = l."ISN_SIA_LANCIPTU_ASG"
             LEFT JOIN tipos t ON s.isn_sia_lanciptu_asg = t."ISN_SIA_LANCIPTU_ASG"
             WHERE s.simulacao_id = :sid AND s.codg_exercicio_lan = :ano
             GROUP BY 1, 2
@@ -494,12 +605,25 @@ def distribuicao_edificacao_sim(
         for r in resultados:
             edf = r["tipo_edificacao"]
             tipo_lan = int(r["tipo_lancamento"] or 0)
-            lan_label = {0: "Normal", 1: "Isento/Imune", 2: "Imposto Mínimo", 3: "IPTU Social"}.get(tipo_lan, "Outros")
+            lan_label = {
+                0: "Normal", 
+                1: "Isento", 
+                2: "Imposto Mínimo", 
+                3: "IPTU Social",
+                4: "Imunidade"
+            }.get(tipo_lan, "Outros")
             
             if edf not in matriz:
-                matriz[edf] = {"Normal": 0, "Isento/Imune": 0, "Imposto Mínimo": 0, "IPTU Social": 0}
+                matriz[edf] = {
+                    "Normal": 0, 
+                    "Isento": 0, 
+                    "Imposto Mínimo": 0, 
+                    "IPTU Social": 0,
+                    "Imunidade": 0
+                }
             
-            matriz[edf][lan_label] = r["quantidade"]
+            if lan_label in matriz[edf]:
+                matriz[edf][lan_label] = int(r["quantidade"])
             
         return RespostaPadrao(dados=matriz)
     except Exception as e:

@@ -188,7 +188,7 @@ export default function SimulacoesPage() {
                         <td className="right">
                           <div className="flex-gap-12" style={{ justifyContent: "flex-end" }}>
                             {s.status === 'CONCLUIDO' && (
-                              <Link href={`/dashboard?contexto=${s.id}`} className="action-link fw-600">analisar</Link>
+                              <Link href={`/simulacoes/${s.id}`} className="action-link fw-600">analisar</Link>
                             )}
                             <button onClick={() => excluir(s.id, s.nome)} className="action-link" style={{ color: "var(--red)" }} disabled={excluindoId === s.id}>
                               {excluindoId === s.id ? "apagando..." : "excluir"}

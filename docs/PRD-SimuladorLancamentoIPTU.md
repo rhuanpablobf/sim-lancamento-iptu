@@ -119,8 +119,8 @@ AND (l.INFO_STATUS_LAN IS NULL OR l.INFO_STATUS_LAN = 1)
 | `NUMR_SEQUENCIA_LAN` | SMALLINT | Sequência do lançamento; `0` = original |
 | `INFO_STATUS_LAN` | SMALLINT | `NULL` ou `1` = Ativo; `2` = Inativo |
 | `TIPO_IMPOSTO_LAN` | SMALLINT | `1` = Predial; `2` = Territorial |
-| `TIPO_LANCAMENTO_LAN` | SMALLINT | `0` = Normal; `1` = Isento; `2` = Mínimo; `3` = IPTU Social |
-| `INFO_POSICAO_FISCAL_LAN` | SMALLINT | `0` = Normal; `1` = Imunidade; `2` = Isento IPTU/Taxas; `3` = Isento Contrib.Melhoria; `4` = Isenção Total; `5` = Não Incidente |
+| `TIPO_LANCAMENTO_LAN` | SMALLINT | `0` = Normal; `1` = Isento; `2` = Mínimo; `3` = IPTU Social; `4` = Imunidade |
+| `INFO_POSICAO_FISCAL_LAN` | SMALLINT | `0` (ou NULL) = Normal; `1` = Imunidade; `2` a `5` = Isenções Diversas |
 | `INFO_USO_LAN` | SMALLINT | `1` = Residencial; `2` = Ativ.Econômica; `3` = Religioso; `4` = Ativ.Pública; `5` = Agro-Pastoril |
 | `INFO_OCUPACAO_LAN` | SMALLINT | `1` = Edificado; `2` = Vago; `3` = Temp.; `4` = Em Construção; `5` = Paralisada; `6` = Demolição; `7` = Ruínas; `8` = Praça |
 | `NUMR_CIM_CONTRIBUINTE_LAN` | INTEGER | Matrícula do contribuinte no CIM |
@@ -195,8 +195,9 @@ IPTU_final = MIN(IPTU_calculado, IPTU_maximo_permitido)
 #### 2.1 — Verificar a posição fiscal
 
 ```
-SE INFO_POSICAO_FISCAL_LAN = 0 OU NULL → NORMAL → prossegue para o cálculo
-SE INFO_POSICAO_FISCAL_LAN ≠ 0 e ≠ NULL → Imunidade/Isenção → classificar e encerrar
+SE INFO_POSICAO_FISCAL_LAN = 0 OU NULL → NORMAL (TIPO 0) → prossegue para o cálculo
+SE INFO_POSICAO_FISCAL_LAN = 1        → IMUNIDADE (TIPO 4) → imposto = 0
+SE INFO_POSICAO_FISCAL_LAN >= 2       → ISENTO (TIPO 1)    → imposto = 0
 ```
 
 #### 2.2 — Determinar o tipo de tributação
@@ -767,8 +768,8 @@ O imposto é registrado sem desconto. Nos relatórios exibir coluna opcional: `V
 | IPTU Social | Isenção total do IPTU para imóvel residencial único de pessoa física com valor venal ≤ limite (Anexo X, item 14 CTM) |
 | Imposto mínimo | Valor mínimo do IPTU (Art. 179 CTM — R$ 100,00 atualizado pela SELIC) |
 | Cap de 5% | Limite de acréscimo anual do IPTU para 2026 e seguintes (Art. 168 §6º CTM) |
-| INFO_STATUS_LAN | `NULL` ou `1` = Ativo; `2` = Inativo (lógica específica da tabela de lançamento) |
-| TIPO_LANCAMENTO_LAN | `0` Normal; `1` Isento; `2` Imposto Mínimo; `3` IPTU Social |
+| INFO_POSICAO_FISCAL_LAN | `0` (ou NULL) = Normal; `1` = Imunidade; `2` a `5` = Isenção |
+| TIPO_LANCAMENTO_LAN | `0` Normal; `1` Isento; `2` Imposto Mínimo; `3` IPTU Social; `4` Imunidade |
 
 ---
 
