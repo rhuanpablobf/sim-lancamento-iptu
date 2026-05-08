@@ -122,6 +122,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
 
         {/* Pontos e Rótulos */}
         {points.map((p: any, i: number) => {
+          const isAtivo = anoAtivo === p[labelKey];
           const val = p[valorKey] || 0;
           let variacao = null;
           if (i > 0) {
