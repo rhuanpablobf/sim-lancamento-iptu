@@ -403,7 +403,25 @@ def executar_motor_completo(
             df_insert["simulacao_id"] = simulacao_id
             df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
 
-            # Salvamento otimizado (Usa a função global psql_insert_copy)
+            # 5. Salvar parâmetros utilizados para auditoria (UM POR ANO)
+            # Como estamos em chunks de imóveis, salvamos os parâmetros apenas na primeira vez que o ano é processado
+            if offset == 0:
+                from app.models import SimulacaoParametroUtilizado
+                param_audit = SimulacaoParametroUtilizado(
+                    simulacao_id=uuid.UUID(simulacao_id),
+                    exercicio=ano,
+                    valr_minimo_iptu=valr_minimo,
+                    limite_venal_social=limite_social,
+                    ipca_ano=parametros.get(ano, {}).get("ipca", 0),
+                    selic_ano=parametros.get(ano, {}).get("selic", 0),
+                    tipo_indice_social=indexador_social,
+                    tipo_indice_minimo=indexador_minimo,
+                    tipo_indice_faixa="SELIC" # Padronizado
+                )
+                db.add(param_audit)
+                db.commit()
+
+            # 6. Salvamento otimizado (Usa a função global psql_insert_copy)
             df_insert.to_sql("sim_lancamentos", db.bind, if_exists="append", index=False, method=psql_insert_copy)
 
             # Preparar base para o próximo ano da simulação deste lote

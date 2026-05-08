@@ -4,6 +4,7 @@ Cria, lista e consulta simulações executadas via Celery.
 """
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.db import obter_sessao
