@@ -188,6 +188,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
 export default function DashboardPage() {
   const [contexto, setContexto] = useState<string>("base"); 
   const [anoSelecionado, setAnoSelecionado] = useState<number | null>(null);
+  const [anosGraficoVisiveis, setAnosGraficoVisiveis] = useState<number[]>([]);
 
   const { data: respSims } = useSWR<{ dados: SimulacaoMin[] }>("/api/simulacoes", fetcher);
   const simulacoes = respSims?.dados?.filter(s => s.status === "CONCLUIDO") || [];
@@ -247,6 +248,25 @@ export default function DashboardPage() {
     fetcher
   );
   const resumoConsolidado = respResumo?.dados || [];
+
+  // Inicializa anos do gráfico quando os dados chegam
+  useEffect(() => {
+    if (d?.arrecadacao_historica) {
+      const todos = d.arrecadacao_historica.map((h: any) => h.exercicio).sort();
+      if (anosGraficoVisiveis.length === 0 && todos.length > 0) {
+        // Por padrão, mostra os últimos 6 anos para manter o gráfico legível
+        setAnosGraficoVisiveis(todos.slice(-6));
+      }
+    }
+  }, [d]);
+
+  const todosAnosGrafico = d?.arrecadacao_historica?.map((h: any) => h.exercicio).sort() || [];
+  
+  const alternarAnoGrafico = (ano: number) => {
+    setAnosGraficoVisiveis(prev => 
+      prev.includes(ano) ? prev.filter(a => a !== ano) : [...prev, ano].sort((a, b) => a - b)
+    );
+  };
 
   const [anosVisiveis, setAnosVisiveis] = useState<number[]>([]);
 
@@ -410,6 +430,38 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Filtro de Período para Gráficos */}
+        <div className="card mt-16" style={{ padding: "12px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <span className="text-sm fw-700" style={{ color: "var(--txt-1)" }}>Período dos Gráficos:</span>
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {todosAnosGrafico.map(ano => (
+                  <button 
+                    key={ano} 
+                    className="btn btn-sm"
+                    style={{
+                      fontSize: "11px", padding: "4px 10px", borderRadius: "6px", margin: 0,
+                      background: anosGraficoVisiveis.includes(ano) ? "var(--blue-light)" : "transparent",
+                      color: anosGraficoVisiveis.includes(ano) ? "var(--blue-txt)" : "var(--txt-4)",
+                      border: `1px solid ${anosGraficoVisiveis.includes(ano) ? "var(--blue-mid)" : "var(--border)"}`,
+                      fontWeight: anosGraficoVisiveis.includes(ano) ? "600" : "400",
+                      transition: "all 0.2s"
+                    }}
+                    onClick={() => alternarAnoGrafico(ano)}
+                  >
+                    {ano}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => setAnosGraficoVisiveis(todosAnosGrafico)}>Todos</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => setAnosGraficoVisiveis([])}>Limpar</button>
+            </div>
+          </div>
+        </div>
+
         {/* Gráficos de Evolução */}
         <div className="grid-3 mt-16">
           <div className="card">
@@ -419,7 +471,7 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               <LineChart 
-                dados={d?.arrecadacao_historica || []} 
+                dados={(d?.arrecadacao_historica || []).filter((h: any) => anosGraficoVisiveis.includes(h.exercicio))} 
                 valorKey="valor"
                 moeda={true} 
                 height={160}
@@ -435,7 +487,7 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               <LineChart 
-                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.normal }))} 
+                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.normal }))} 
                 valorKey="valor"
                 height={160}
                 anoAtivo={anoSelecionado}
@@ -450,7 +502,7 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               <LineChart 
-                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.social }))} 
+                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.social }))} 
                 valorKey="valor"
                 height={160}
                 anoAtivo={anoSelecionado}
@@ -465,7 +517,7 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               <LineChart 
-                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.isentos }))} 
+                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.isentos }))} 
                 valorKey="valor"
                 height={160}
                 anoAtivo={anoSelecionado}
@@ -480,7 +532,7 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               <LineChart 
-                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.imunes }))} 
+                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.imunes }))} 
                 valorKey="valor"
                 height={160}
                 anoAtivo={anoSelecionado}
@@ -495,7 +547,7 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               <LineChart 
-                dados={(d?.volume_historico || []).map((v: any) => ({ ...v, valor: v.minimo }))} 
+                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.minimo }))} 
                 valorKey="valor"
                 height={160}
                 anoAtivo={anoSelecionado}
