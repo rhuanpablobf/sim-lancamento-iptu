@@ -527,7 +527,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.isentos }))} 
                 valorKey="valor"
-                height={90} // Ajustado
+                height={140} // Restaurado
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -542,7 +542,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.imunes }))} 
                 valorKey="valor"
-                height={90} // Ajustado
+                height={140} // Restaurado
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.minimo }))} 
                 valorKey="valor"
-                height={90} // Ajustado
+                height={140} // Restaurado
                 anoAtivo={anoSelecionado}
               />
             </div>
