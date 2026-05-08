@@ -357,7 +357,6 @@ def executar_motor_completo(
     faixas_ref = faixas_por_ano.get(exercicio_base, [])
 
     for ano in range(exercicio_base + 1, exercicio_destino + 1):
-        import time
         start_time = time.time()
         print(f"--- Processando Exercício {ano} (Total: {len(df_corrente)} imóveis) ---")
         
