@@ -352,6 +352,15 @@ def executar_motor_completo(
         # Pré-processamento social do lote (regras que dependem do edifício)
         df_lote_base = _preprocessar_regras_sociais(df_lote_base)
 
+        # 4. Definir Categoria de Tributação (Residencial, Não Residencial, Territorial)
+        condicoes_cat = [
+            df_lote_base["TIPO_IMPOSTO_LAN"] == 2,
+            (df_lote_base["TIPO_IMPOSTO_LAN"] == 1) & (df_lote_base["INFO_USO_LAN"] == 1),
+            (df_lote_base["TIPO_IMPOSTO_LAN"] == 1) & (df_lote_base["INFO_USO_LAN"] != 1),
+        ]
+        escolhas_cat = ["TERRITORIAL", "RESIDENCIAL", "NAO_RESIDENCIAL"]
+        df_lote_base["categoria_tributacao"] = np.select(condicoes_cat, escolhas_cat, default="RESIDENCIAL")
+
         df_lote_corrente = df_lote_base.copy()
         faixas_correntes_ref = faixas_por_ano.get(exercicio_base, [])
 
