@@ -329,7 +329,7 @@ def dashboard_simulacao(
             ),
             todos AS (SELECT * FROM hist UNION SELECT * FROM sim),
             params AS (
-                SELECT exercicio, limite_venal_social FROM "SIA_LANCIPTU_ASG_PARAMS_SIM"
+                SELECT exercicio, limite_venal_social FROM sim_simulacao_parametros_utilizados
                 WHERE simulacao_id = :sid
             )
             SELECT t.ex AS exercicio, t.qtd AS quantidade, COALESCE(p.limite_venal_social, 0) AS limite_vigente
