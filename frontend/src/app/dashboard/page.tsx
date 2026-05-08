@@ -462,8 +462,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Gráficos de Evolução */}
-        <div className="grid-3 mt-16">
+        {/* Gráficos de Evolução - Nova Hierarquia Visual */}
+        
+        {/* Linha 1: Lançamento (Destaque Total) */}
+        <div className="mt-16">
           <div className="card">
             <div className="card-header">
               <div className="card-title">Lançamento (Milhões R$)</div>
@@ -474,12 +476,15 @@ export default function DashboardPage() {
                 dados={(d?.arrecadacao_historica || []).filter((h: any) => anosGraficoVisiveis.includes(h.exercicio))} 
                 valorKey="valor"
                 moeda={true} 
-                height={160}
+                height={220} // Maior destaque
                 anoAtivo={anoSelecionado}
               />
             </div>
           </div>
+        </div>
 
+        {/* Linha 2: Normal e IPTU Social (2 Colunas) */}
+        <div className="grid-2 mt-16">
           <div className="card">
             <div className="card-header">
               <div className="card-title">Normal (Qtd. Imóveis)</div>
@@ -509,7 +514,10 @@ export default function DashboardPage() {
               />
             </div>
           </div>
+        </div>
 
+        {/* Linha 3: Isentos, Imunes e Imposto Mínimo (3 Colunas) */}
+        <div className="grid-3 mt-16">
           <div className="card">
             <div className="card-header">
               <div className="card-title">Isentos (Qtd. Imóveis)</div>
@@ -519,7 +527,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.isentos }))} 
                 valorKey="valor"
-                height={160}
+                height={140}
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -534,7 +542,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.imunes }))} 
                 valorKey="valor"
-                height={160}
+                height={140}
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -549,7 +557,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.minimo }))} 
                 valorKey="valor"
-                height={160}
+                height={140}
                 anoAtivo={anoSelecionado}
               />
             </div>
