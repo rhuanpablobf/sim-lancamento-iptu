@@ -114,6 +114,41 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
           </div>
         </div>
       </div>
+      
+      {paramsUtilizados.length > 0 && (
+        <div style={{ padding: "0 24px 20px 24px" }}>
+          <div className="card" style={{ borderTop: "none", borderRadius: "0 0 var(--radius) var(--radius)" }}>
+            <div className="card-body-flush table-wrap">
+              <table style={{ fontSize: "12px" }}>
+                <thead style={{ background: "var(--surface-2)" }}>
+                  <tr>
+                    <th style={{ padding: "8px 16px" }}>Exercício</th>
+                    <th className="right" style={{ padding: "8px 16px" }}>IPCA Aplicado</th>
+                    <th className="right" style={{ padding: "8px 16px" }}>SELIC Aplicado</th>
+                    <th className="right" style={{ padding: "8px 16px" }}>Valor Mínimo</th>
+                    <th className="right" style={{ padding: "8px 16px" }}>Limite Venal Social</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paramsUtilizados.map(p => (
+                    <tr key={p.exercicio}>
+                      <td className="fw-700" style={{ padding: "8px 16px" }}>{p.exercicio}</td>
+                      <td className="right" style={{ padding: "8px 16px" }}>
+                        <span className="badge badge-gray" style={{ fontSize: "10px" }}>{p.ipca_ano}%</span>
+                      </td>
+                      <td className="right" style={{ padding: "8px 16px" }}>
+                        <span className="badge badge-gray" style={{ fontSize: "10px" }}>{p.selic_ano}%</span>
+                      </td>
+                      <td className="right fw-600 text-mono" style={{ padding: "8px 16px" }}>{fmtMoeda(p.valr_minimo_iptu)}</td>
+                      <td className="right fw-600 text-mono" style={{ padding: "8px 16px", color: "var(--blue-txt)" }}>{fmtMoeda(p.limite_venal_social)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="page-content">
         <div className="row">
