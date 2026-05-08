@@ -281,194 +281,151 @@ def executar_motor_completo(
     atualizar_progresso: callable = None,
 ) -> None:
     """
-    Ponto de entrada do motor. Processa todos os exercícios sequencialmente.
+    Ponto de entrada do motor. Processa os imóveis em LOTES (Chunks) para economizar RAM.
     """
     inicio_total = time.time()
 
-    # Carregar base de imóveis do exercício base com o tipo de edificação (tabela auxiliar)
-    df_base = pd.read_sql(
-        f"""
-        SELECT t1.*, t2."INFO_TIPO_EDF_LAN"
-        FROM "SIA_LANCIPTU_ASG" t1
-        LEFT JOIN (
-            SELECT "ISN_SIA_LANCIPTU_ASG", MIN("INFO_TIPO_EDF_LAN") as "INFO_TIPO_EDF_LAN"
-            FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
-            GROUP BY "ISN_SIA_LANCIPTU_ASG"
-        ) t2 ON t1."ISN_SIA_LANCIPTU_ASG" = t2."ISN_SIA_LANCIPTU_ASG"
-        WHERE t1."CODG_EXERCICIO_LAN" = {exercicio_base}
-          AND (t1."INFO_STATUS_LAN" IS NULL OR t1."INFO_STATUS_LAN" = '1')
-        """,
-        db.bind,
-    )
+    # 1. Contagem Total de Imóveis (Rápido)
+    res_count = db.execute(text(f"""
+        SELECT COUNT(*) FROM "SIA_LANCIPTU_ASG" 
+        WHERE "CODG_EXERCICIO_LAN" = {exercicio_base}
+          AND ("INFO_STATUS_LAN" IS NULL OR "INFO_STATUS_LAN" = '1')
+    """)).fetchone()
+    total_imoveis = res_count[0] if res_count else 0
 
-    if df_base.empty:
+    if total_imoveis == 0:
         raise ValueError(f"Nenhum imóvel encontrado para o exercício base {exercicio_base}.")
 
-    # Garantir que colunas da base externa estejam em CAIXA ALTA para consistência
-    df_base.columns = [c.upper() for c in df_base.columns]
-    
-    # Remover colunas duplicadas que podem ter surgido do JOIN ou do banco
-    df_base = df_base.loc[:, ~df_base.columns.duplicated()].copy()
-
-    # IMPORTANTE: Resetar o índice para evitar o erro "cannot reindex on an axis with duplicate labels"
-    # Isso garante que cada linha tenha um índice único e sequencial (0, 1, 2...)
-    df_base = df_base.reset_index(drop=True)
-
-    total_imoveis = len(df_base)
     atualizar_progresso(total_imoveis=total_imoveis, status="PROCESSANDO")
 
-    # Pré-processamento das Regras Sociais (Unicidade e CPF/CNPJ)
-    df_base = _preprocessar_regras_sociais(df_base)
+    # 2. Pré-processamento Social Global (Contagem por CPF/CNPJ)
+    # Fazemos isso uma vez para a base toda para garantir integridade entre os lotes
+    print("Calculando contagem global de imóveis por CPF...")
+    df_counts = pd.read_sql(f"""
+        SELECT "INFO_CPF_CGC_LAN", COUNT(*) as total_imoveis_cpf
+        FROM "SIA_LANCIPTU_ASG"
+        WHERE "CODG_EXERCICIO_LAN" = {exercicio_base}
+          AND ("INFO_STATUS_LAN" IS NULL OR "INFO_STATUS_LAN" = '1')
+        GROUP BY "INFO_CPF_CGC_LAN"
+    """, db.bind)
+    
+    # Converter para dicionário para busca ultra rápida
+    dict_counts = df_counts.set_index("INFO_CPF_CGC_LAN")["total_imoveis_cpf"].to_dict()
+    del df_counts # Limpa RAM
 
-    # Preparar categoria no df_base
-    condicoes_cat = [
-        df_base["TIPO_IMPOSTO_LAN"] == 2,
-        (df_base["TIPO_IMPOSTO_LAN"] == 1) & (df_base["INFO_USO_LAN"] == 1),
-        (df_base["TIPO_IMPOSTO_LAN"] == 1) & (df_base["INFO_USO_LAN"] != 1),
-    ]
-    escolhas_cat = ["TERRITORIAL", "RESIDENCIAL", "NAO_RESIDENCIAL"]
-    df_base["categoria_tributacao"] = np.select(condicoes_cat, escolhas_cat, default="RESIDENCIAL")
-
-    faixas_base = faixas_por_ano.get(exercicio_base, faixas_por_ano.get(min(faixas_por_ano.keys()), []))
+    # 3. Processamento em LOTES (Chunks)
+    CHUNK_SIZE = 100000
     exercicios_concluidos = []
+    
+    # Preparar estatísticas consolidadas por ano
+    stats_por_ano = {ano: {"total": 0, "iptu_social": 0, "imposto_minimo": 0} 
+                    for ano in range(exercicio_base + 1, exercicio_destino + 1)}
 
-    for ano in range(exercicio_base + 1, exercicio_destino + 1):
-        inicio_ano = time.time()
-        faixas_novo = faixas_por_ano.get(ano, [])
-
-        atualizar_progresso(exercicio_atual=ano)
-
-        df_resultado, valr_minimo, limite_social = simular_exercicio(
-            df_base=df_base,
-            faixas_base=faixas_base,
-            faixas_novo=faixas_novo,
-            parametros=parametros,
-            configs_base=configs_base,
-            ano=ano,
-            exercicio_base=exercicio_base,
-            indexador_social=indexador_social,
-            indexador_minimo=indexador_minimo,
-            aplicar_cap=aplicar_cap,
-        )
-
-        # Salvar parâmetros utilizados para auditoria
-        from app.models import Simulacao, SimulacaoParametroUtilizado
-        sim_obj = db.query(Simulacao).filter(Simulacao.id == uuid.UUID(simulacao_id)).first()
+    for offset in range(0, total_imoveis, CHUNK_SIZE):
+        print(f"Processando lote {offset} até {offset + CHUNK_SIZE}...")
         
-        param_audit = SimulacaoParametroUtilizado(
-            simulacao_id=uuid.UUID(simulacao_id),
-            exercicio=ano,
-            valr_minimo_iptu=valr_minimo,
-            limite_venal_social=limite_social,
-            ipca_ano=parametros.get(ano, {}).get("ipca", 0),
-            selic_ano=parametros.get(ano, {}).get("selic", 0),
-            tipo_indice_social=indexador_social,
-            tipo_indice_minimo=indexador_minimo,
-            tipo_indice_faixa=sim_obj.cenario if sim_obj else "SELIC",
-            indice_aplicado=parametros.get(ano, {}).get(indexador_minimo.lower(), 0), # Compatibilidade
-            tipo_indice=indexador_minimo # Compatibilidade
-        )
-        db.add(param_audit)
-        db.commit()
+        # Carregar pedaço da base
+        df_lote_base = pd.read_sql(f"""
+            SELECT t1.*, t2."INFO_TIPO_EDF_LAN"
+            FROM "SIA_LANCIPTU_ASG" t1
+            LEFT JOIN (
+                SELECT "ISN_SIA_LANCIPTU_ASG", MIN("INFO_TIPO_EDF_LAN") as "INFO_TIPO_EDF_LAN"
+                FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
+                GROUP BY "ISN_SIA_LANCIPTU_ASG"
+            ) t2 ON t1."ISN_SIA_LANCIPTU_ASG" = t2."ISN_SIA_LANCIPTU_ASG"
+            WHERE t1."CODG_EXERCICIO_LAN" = {exercicio_base}
+              AND (t1."INFO_STATUS_LAN" IS NULL OR t1."INFO_STATUS_LAN" = '1')
+            ORDER BY t1."ISN_SIA_LANCIPTU_ASG"
+            LIMIT {CHUNK_SIZE} OFFSET {offset}
+        """, db.bind)
 
-        # Preparar registros para inserção em lote
-        colunas = [
-            "ISN_SIA_LANCIPTU_ASG", "CODG_INSCRICAO_LAN", "codg_exercicio_lan",
-            "valr_venal_simulado", "valr_aliquota_calculada",
-            "valr_iptu_bruto", "valr_iptu_cap", "valr_imposto_final",
-            "tipo_lancamento", "faixa_anterior", "faixa_atual", "migrou_faixa",
-            "VALR_IMPOSTO_LAN", "VALR_VENAL_LAN"
-        ]
-        colunas_existentes = [c for c in colunas if c in df_resultado.columns]
-        df_insert = df_resultado[colunas_existentes].rename(
-            columns={
+        if df_lote_base.empty:
+            break
+
+        df_lote_base.columns = [c.upper() for c in df_lote_base.columns]
+        df_lote_base = df_lote_base.loc[:, ~df_lote_base.columns.duplicated()].copy()
+        df_lote_base = df_lote_base.reset_index(drop=True)
+
+        # Injetar contagens globais no lote
+        df_lote_base["total_imoveis_cpf"] = df_lote_base["INFO_CPF_CGC_LAN"].map(dict_counts).fillna(0)
+        
+        # Pré-processamento social do lote (regras que dependem do edifício)
+        df_lote_base = _preprocessar_regras_sociais(df_lote_base)
+
+        df_lote_corrente = df_lote_base.copy()
+        faixas_correntes_ref = faixas_por_ano.get(exercicio_base, [])
+
+        # Processar todos os anos para este lote de imóveis
+        for ano in range(exercicio_base + 1, exercicio_destino + 1):
+            faixas_novo = faixas_por_ano.get(ano, [])
+            
+            df_resultado, valr_minimo, limite_social = simular_exercicio(
+                df_base=df_lote_corrente,
+                faixas_base=faixas_correntes_ref,
+                faixas_novo=faixas_novo,
+                parametros=parametros,
+                configs_base=configs_base,
+                ano=ano,
+                exercicio_base=exercicio_base,
+                indexador_social=indexador_social,
+                indexador_minimo=indexador_minimo,
+                aplicar_cap=aplicar_cap,
+            )
+
+            # Acumular estatísticas
+            stats_por_ano[ano]["total"] += len(df_resultado)
+            stats_por_ano[ano]["iptu_social"] += int((df_resultado["tipo_lancamento"] == 3).sum())
+            stats_por_ano[ano]["imposto_minimo"] += int((df_resultado["tipo_lancamento"] == 2).sum())
+
+            # Preparar registros para inserção
+            df_insert = df_resultado[[
+                "ISN_SIA_LANCIPTU_ASG", "CODG_INSCRICAO_LAN", "codg_exercicio_lan",
+                "valr_venal_simulado", "valr_aliquota_calculada",
+                "valr_iptu_bruto", "valr_iptu_cap", "valr_imposto_final",
+                "tipo_lancamento", "faixa_anterior", "faixa_atual", "migrou_faixa",
+                "VALR_IMPOSTO_LAN", "VALR_VENAL_LAN"
+            ]].rename(columns={
                 "ISN_SIA_LANCIPTU_ASG": "isn_sia_lanciptu_asg",
                 "CODG_INSCRICAO_LAN": "codg_inscricao_lan",
                 "valr_aliquota_calculada": "valr_aliquota_simulada",
                 "VALR_IMPOSTO_LAN": "valr_imposto_anterior",
                 "VALR_VENAL_LAN": "valr_venal_base"
-            }
-        )
-        df_insert["simulacao_id"] = simulacao_id
-        # Gerar UUIDs no Python pois o COPY ignora os defaults do SQLAlchemy
-        df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
+            })
+            df_insert["simulacao_id"] = simulacao_id
+            df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
 
-        # Atualizar progresso parcial (Cálculo concluído, iniciando salvamento)
-        atualizar_progresso(
-            total_processados=(ano - exercicio_base - 0.5) * total_imoveis,
-        )
+            # Salvamento otimizado
+            from app.services.motor_simulacao import psql_insert_copy
+            df_insert.to_sql("sim_lancamentos", db.bind, if_exists="append", index=False, method=psql_insert_copy)
 
-        # Salvamento otimizado para PostgreSQL
-        print(f"[{ano}] Salvando {len(df_insert)} registros no banco...")
-        
-        # Função auxiliar para inserção rápida
-        from sqlalchemy import text
-        def psql_insert_copy(table, conn, keys, data_iter):
-            import csv
-            from io import StringIO
-            
-            # Preparar buffer em memória
-            s_buf = StringIO()
-            writer = csv.writer(s_buf)
-            writer.writerows(data_iter)
-            s_buf.seek(0)
-            
-            columns = ', '.join([f'"{k}"' for k in keys])
-            table_name = table.name
-            if table.schema:
-                table_name = f'"{table.schema}"."{table_name}"'
-            else:
-                table_name = f'"{table_name}"'
-                
-            sql = f'COPY {table_name} ({columns}) FROM STDIN WITH CSV'
-            
-            dbapi_conn = conn.connection
-            with dbapi_conn.cursor() as cur:
-                cur.copy_expert(sql=sql, file=s_buf)
-
-        # Usar o método de cópia rápida
-        df_insert.to_sql(
-            "sim_lancamentos",
-            db.bind,
-            if_exists="append",
-            index=False,
-            method=psql_insert_copy
-        )
-
-        tempo_ano = round(time.time() - inicio_ano, 1)
-        concluido = {
-            "exercicio": ano,
-            "total": total_imoveis,
-            "iptu_social": int((df_resultado["tipo_lancamento"] == 3).sum()),
-            "imposto_minimo": int((df_resultado["tipo_lancamento"] == 2).sum()),
-            "tempo_segundos": tempo_ano,
-        }
-        exercicios_concluidos.append(concluido)
-        atualizar_progresso(
-            exercicios_concluidos=exercicios_concluidos,
-            total_processados=(ano - exercicio_base) * total_imoveis,
-        )
-
-        # Próximo ano usa o resultado como base
-        # IMPORTANTÍSSIMO: Dropamos as colunas originais antes do rename para evitar duplicidade
-        # e garantir que o '~duplicated()' mantenha o valor atualizado e não o antigo.
-        cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN"]
-        df_base_next = df_resultado.drop(columns=[c for c in cols_base_antigas if c in df_resultado.columns])
-        
-        df_base = df_base_next.rename(
-            columns={
+            # Preparar base para o próximo ano da simulação deste lote
+            cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN"]
+            df_lote_corrente = df_resultado.drop(columns=[c for c in cols_base_antigas if c in df_resultado.columns])
+            df_lote_corrente = df_lote_corrente.rename(columns={
                 "valr_venal_simulado": "VALR_VENAL_LAN",
                 "valr_imposto_final": "VALR_IMPOSTO_LAN",
                 "valr_venal_social_simulado": "valr_venal_social_base"
+            }).reset_index(drop=True)
+            
+            cols_limpar = ["faixa_atual", "faixa_label", "valr_aliquota_calculada", "faixa_anterior", "migrou_faixa", "valr_venal_social_simulado"]
+            df_lote_corrente = df_lote_corrente.drop(columns=[c for c in cols_limpar if c in df_lote_corrente.columns])
+            faixas_correntes_ref = faixas_novo
+
+        # Atualizar progresso geral (após processar todos os anos para este lote)
+        processados_total_lote = offset + len(df_lote_base)
+        exercicios_concluidos = [
+            {
+                "exercicio": ano,
+                "total": stats["total"],
+                "iptu_social": stats["iptu_social"],
+                "imposto_minimo": stats["imposto_minimo"],
+                "tempo_segundos": 0 
             }
-        ).reset_index(drop=True)
-        
-        # Limpar colunas de cálculo do ano anterior para não duplicar no próximo
-        cols_limpar = ["faixa_atual", "faixa_label", "valr_aliquota_calculada", "faixa_anterior", "migrou_faixa", "valr_venal_social_simulado"]
-        df_base = df_base.drop(columns=[c for c in cols_limpar if c in df_base.columns])
-        # Remover duplicatas por nome (segurança extra, agora o valor atualizado será o único)
-        df_base = df_base.loc[:, ~df_base.columns.duplicated()]
-        
-        faixas_base = faixas_novo
+            for ano, stats in stats_por_ano.items() if stats["total"] > 0
+        ]
+        atualizar_progresso(
+            total_processados=processados_total_lote,
+            exercicios_concluidos=exercicios_concluidos
+        )
 
     atualizar_progresso(status="CONCLUIDO", exercicios_concluidos=exercicios_concluidos)
