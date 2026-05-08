@@ -72,7 +72,7 @@ const variacao = (atual: number, anterior?: number, exercicioRef?: number | stri
   };
 };
 
-const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, moeda = false, anoAtivo = null }: any) => {
+const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, moeda = false, anoAtivo = null, fontScale = 1 }: any) => {
   if (!dados || dados.length === 0) return <div className="table-empty">Sem dados para o gráfico</div>;
 
   const padding = { top: 30, right: 40, bottom: 30, left: 40 };
@@ -145,9 +145,9 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               {variacao !== null && (
                 <text 
                   x={p.x} 
-                  y={p.y - 28} 
+                  y={p.y - (28 * fontScale)} 
                   textAnchor="middle" 
-                  fontSize="10" 
+                  fontSize={10 * fontScale} 
                   fontWeight="700" 
                   fill={variacao > 0 ? "var(--green)" : variacao < 0 ? "var(--red)" : "var(--txt-4)"}
                 >
@@ -156,9 +156,9 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               )}
               <text 
                 x={p.x} 
-                y={p.y - 12} 
+                y={p.y - (12 * fontScale)} 
                 textAnchor="middle" 
-                fontSize="11" 
+                fontSize={11 * fontScale} 
                 fontWeight="600" 
                 fill="var(--txt-1)"
                 style={{ opacity: 0.9 }}
@@ -167,9 +167,9 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               </text>
               <text 
                 x={p.x} 
-                y={height - 10} 
+                y={height - (10 * fontScale)} 
                 textAnchor="middle" 
-                fontSize="11" 
+                fontSize={11 * fontScale} 
                 fontWeight={isAtivo ? "700" : "400"} 
                 fill={isAtivo ? "var(--txt-1)" : "var(--txt-4)"}
               >
@@ -476,8 +476,9 @@ export default function DashboardPage() {
                 dados={(d?.arrecadacao_historica || []).filter((h: any) => anosGraficoVisiveis.includes(h.exercicio))} 
                 valorKey="valor"
                 moeda={true} 
-                height={110} // Reduzido em 50%
+                height={110} 
                 anoAtivo={anoSelecionado}
+                fontScale={0.5} // Redução de 50% na fonte
               />
             </div>
           </div>
