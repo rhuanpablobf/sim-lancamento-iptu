@@ -476,7 +476,7 @@ export default function DashboardPage() {
                 dados={(d?.arrecadacao_historica || []).filter((h: any) => anosGraficoVisiveis.includes(h.exercicio))} 
                 valorKey="valor"
                 moeda={true} 
-                height={220} // Maior destaque
+                height={110} // Reduzido em 50%
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -494,7 +494,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.normal }))} 
                 valorKey="valor"
-                height={160}
+                height={100} // Ajustado
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -509,7 +509,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.social }))} 
                 valorKey="valor"
-                height={160}
+                height={100} // Ajustado
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -527,7 +527,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.isentos }))} 
                 valorKey="valor"
-                height={140}
+                height={90} // Ajustado
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -542,7 +542,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.imunes }))} 
                 valorKey="valor"
-                height={140}
+                height={90} // Ajustado
                 anoAtivo={anoSelecionado}
               />
             </div>
@@ -557,7 +557,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.minimo }))} 
                 valorKey="valor"
-                height={140}
+                height={90} // Ajustado
                 anoAtivo={anoSelecionado}
               />
             </div>
