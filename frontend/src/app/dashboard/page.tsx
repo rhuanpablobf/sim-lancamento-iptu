@@ -72,7 +72,7 @@ const variacao = (atual: number, anterior?: number, exercicioRef?: number | stri
   };
 };
 
-const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, moeda = false, anoAtivo = null, fontScale = 1 }: any) => {
+const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, moeda = false, anoAtivo = null, fontScale = 1, lineWidth = 1 }: any) => {
   if (!dados || dados.length === 0) return <div className="table-empty">Sem dados para o gráfico</div>;
 
   const padding = { top: 30, right: 40, bottom: 30, left: 40 };
@@ -114,7 +114,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
           d={pathD} 
           fill="none" 
           stroke="#0e4f66" 
-          strokeWidth="1" 
+          strokeWidth={lineWidth} 
           strokeLinecap="round" 
           strokeLinejoin="round" 
           style={{ transition: "all 0.3s" }}
@@ -530,6 +530,8 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={140} // Restaurado
                 anoAtivo={anoSelecionado}
+                fontScale={1.3}
+                lineWidth={1.3}
               />
             </div>
           </div>
@@ -545,6 +547,8 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={140} // Restaurado
                 anoAtivo={anoSelecionado}
+                fontScale={1.3}
+                lineWidth={1.3}
               />
             </div>
           </div>
@@ -560,6 +564,8 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={140} // Restaurado
                 anoAtivo={anoSelecionado}
+                fontScale={1.3}
+                lineWidth={1.3}
               />
             </div>
           </div>
