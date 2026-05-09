@@ -114,7 +114,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
           d={pathD} 
           fill="none" 
           stroke="#0e4f66" 
-          strokeWidth="1.5" 
+          strokeWidth="1" 
           strokeLinecap="round" 
           strokeLinejoin="round" 
           style={{ transition: "all 0.3s" }}
@@ -135,7 +135,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               <circle 
                 cx={p.x} 
                 cy={p.y} 
-                r={isAtivo ? 6 : 4} 
+                r={isAtivo ? 2 : 1.2} 
                 fill={isAtivo ? "#0e4f66" : "#fff"} 
                 stroke="#0e4f66" 
                 strokeWidth="2" 
