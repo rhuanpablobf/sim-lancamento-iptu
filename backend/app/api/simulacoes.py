@@ -115,9 +115,19 @@ def excluir_simulacao(simulacao_id: UUID, db: Session = Depends(obter_sessao)) -
     
     # 5. Apagar o registro pai (Simulacao)
     db.delete(item)
-    
     db.commit()
-    return RespostaPadrao(dados={"mensagem": "Simulação e registros vinculados excluídos com sucesso."})
+
+    # 6. Apagar do ClickHouse (Limpeza analítica)
+    try:
+        ch_client = obter_cliente()
+        if ch_client:
+            # Comando assíncrono de deleção no ClickHouse
+            ch_client.command(f"ALTER TABLE sim_lancamentos_analitico DELETE WHERE simulacao_id = '{sid_str}'")
+    except Exception as e_ch:
+        import logging
+        logging.error(f"Erro ao excluir dados no ClickHouse para {sid_str}: {e_ch}")
+
+    return RespostaPadrao(dados={"mensagem": "Simulação e registros vinculados (Postgres + ClickHouse) excluídos com sucesso."})
 
 
 @router.get("/{simulacao_id}/resultado", summary="Resultado por faixa e exercício")
@@ -447,17 +457,23 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
                 
                 if resultado_ch.result_rows:
                     resultado = {}
-                    labels_por_codigo = {}
                     for row in resultado_ch.result_rows:
                         cat, fx_cod, fx_label, ano, total = row
+                        
+                        # Limpar labels com ???
+                        if fx_label and "???" in fx_label:
+                            fx_label = fx_label.split("???")[-1].strip()
+                        
+                        label_final = fx_label or f"Faixa {fx_cod}"
                         if cat not in resultado: resultado[cat] = {}
-                        chave_cod = f"{cat}:{fx_cod}"
-                        if chave_cod not in labels_por_codigo or (not labels_por_codigo[chave_cod] and fx_label):
-                            labels_por_codigo[chave_cod] = fx_label
-                        label_final = labels_por_codigo.get(chave_cod) or fx_label or f"Faixa {fx_cod}"
                         if label_final not in resultado[cat]:
-                            resultado[cat][label_final] = {"ordem": fx_cod, "dados": {}}
+                            resultado[cat][label_final] = {"ordem": int(fx_cod or 0), "dados": {}}
                         resultado[cat][label_final]["dados"][ano] = total
+                    
+                    # Garantir ordenação numérica das faixas
+                    for cat in resultado:
+                        resultado[cat] = dict(sorted(resultado[cat].items(), key=lambda x: x[1]["ordem"]))
+
                     response.headers["X-Data-Source"] = "ClickHouse"
                     return RespostaPadrao(dados=resultado)
                 else:
@@ -465,7 +481,7 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
             except Exception as e_ch:
                 logging.error(f"Erro ao consultar ClickHouse: {e_ch}. Recorrendo ao Postgres.")
 
-        # Fallback para PostgreSQL (Lógica original otimizada)
+        # Fallback para PostgreSQL
         item = db.get(Simulacao, simulacao_id)
         if not item:
             raise HTTPException(status_code=404, detail="Simulação não encontrada.")
@@ -497,20 +513,24 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
         """), {"sid": str(simulacao_id)}).mappings().all()
 
         resultado = {}
-        labels_por_codigo = {}
         def inserir_no_mapa(rows):
             for r in rows:
                 cat = r["categoria"]; fx_cod = r["faixa_codigo"]; fx_label = r["faixa_label"]; ano = r["ano"]; total = r["total"]
+                if fx_label and "???" in fx_label:
+                    fx_label = fx_label.split("???")[-1].strip()
+                label_final = fx_label or f"Faixa {fx_cod}"
                 if cat not in resultado: resultado[cat] = {}
-                chave_cod = f"{cat}:{fx_cod}"
-                if chave_cod not in labels_por_codigo or (not labels_por_codigo[chave_cod] and fx_label):
-                    labels_por_codigo[chave_cod] = fx_label
-                label_final = labels_por_codigo.get(chave_cod) or fx_label or f"Faixa {fx_cod}"
-                if label_final not in resultado[cat]: resultado[cat][label_final] = {"ordem": fx_cod, "dados": {}}
+                if label_final not in resultado[cat]:
+                    resultado[cat][label_final] = {"ordem": int(fx_cod or 0), "dados": {}}
                 resultado[cat][label_final]["dados"][ano] = resultado[cat][label_final]["dados"].get(ano, 0) + total
 
         inserir_no_mapa(historico)
         inserir_no_mapa(simulado)
+
+        # Ordenar Postgres Fallback também
+        for cat in resultado:
+            resultado[cat] = dict(sorted(resultado[cat].items(), key=lambda x: x[1]["ordem"]))
+
         response.headers["X-Data-Source"] = "PostgreSQL"
         return RespostaPadrao(dados=resultado)
     except Exception as e:
