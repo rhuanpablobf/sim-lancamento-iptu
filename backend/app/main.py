@@ -7,12 +7,19 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import importacao, parametros, faixas, simulacoes, exportacao, classificacao, configuracoes
 from app.db import engine, Base
 from app.migrar import migrar
+from app.clickhouse import inicializar_clickhouse
 
 # Executa migrações de schema customizadas (adiciona colunas faltantes)
 migrar()
 
 # Cria as tabelas caso não existam (útil quando init.sql não roda)
 Base.metadata.create_all(bind=engine)
+
+# Inicializa ClickHouse (Schema Analítico)
+try:
+    inicializar_clickhouse()
+except Exception as e:
+    print(f"Aviso: ClickHouse não disponível no momento: {e}")
 
 app = FastAPI(
     title="SimLan IPTU API",

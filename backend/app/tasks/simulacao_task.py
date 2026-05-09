@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.models import Simulacao, FaixaAliquota, ParametroMacroeconomico, ConfiguracaoBase
+from app.clickhouse import sincronizar_simulacao_para_clickhouse
 
 from app.celery_app import celery_app
 
@@ -128,6 +129,13 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
             aplicar_cap=simulacao.aplicar_cap,
             atualizar_progresso=atualizar_progresso,
         )
+
+        # 5. Sincronizar com ClickHouse para Dashboard Ultrarápido
+        try:
+            sincronizar_simulacao_para_clickhouse(simulacao_id, db)
+        except Exception as e:
+            import logging
+            logging.error(f"Erro ao sincronizar com ClickHouse: {e}")
 
         return {"status": "CONCLUIDO", "simulacao_id": simulacao_id}
 

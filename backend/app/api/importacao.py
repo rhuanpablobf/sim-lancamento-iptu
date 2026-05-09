@@ -7,6 +7,7 @@ from sqlalchemy import text
 
 from app.db import obter_sessao
 from app.schemas import RespostaPadrao
+from app.clickhouse import sincronizar_historico_para_clickhouse, sincronizar_todas_simulacoes_para_clickhouse
 from app.celery_app import celery_app
 from app.models import ParametroMacroeconomico
 
@@ -169,8 +170,22 @@ async def consultar_status(task_id: str):
             "mensagem": f"Erro ao consultar: {str(e)}",
             "detalhes": {}
         })
-# (Eu vou manter os outros endpoints que já existiam mas vou simplificar o arquivo para focar no novo fluxo)
-# Na verdade, vou fazer um merge cuidadoso.
+
+from app.clickhouse import inicializar_clickhouse, sincronizar_historico_para_clickhouse, sincronizar_todas_simulacoes_para_clickhouse
+
+@router.post("/sync-analitico", summary="Sincroniza base histórica para o ClickHouse")
+def sync_analitico(db: Session = Depends(obter_sessao)):
+    """Dispara a sincronização manual da base histórica do Postgres para o ClickHouse."""
+    try:
+        # Garante que as tabelas existam com o schema correto
+        inicializar_clickhouse()
+        
+        # Sincroniza histórico e todas as simulações
+        sincronizar_historico_para_clickhouse(db)
+        sincronizar_todas_simulacoes_para_clickhouse(db)
+        return {"mensagem": "Sincronização analítica completa (histórico + simulações) concluída com sucesso."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro na sincronização: {str(e)}")
 
 @router.delete("/exercicio/{ano}")
 def excluir_exercicio(ano: int, db: Session = Depends(obter_sessao)):

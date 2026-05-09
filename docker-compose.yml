@@ -5,6 +5,7 @@ services:
     image: postgres:15-alpine
     container_name: iptu_postgres
     restart: always
+    shm_size: '1gb'
     environment:
       POSTGRES_USER: iptu_user
       POSTGRES_PASSWORD: iptu_password
@@ -46,11 +47,16 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=iptu_password
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      clickhouse:
+        condition: service_started
     volumes:
       - ./backend:/app
       - ./dados_iptu:/data
@@ -67,11 +73,16 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=iptu_password
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      clickhouse:
+        condition: service_started
     volumes:
       - ./backend:/app
       - ./dados_iptu:/data
@@ -106,5 +117,25 @@ services:
     depends_on:
       - db
 
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: iptu_clickhouse
+    restart: always
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    environment:
+      - CLICKHOUSE_DB=lancamento_iptu
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=iptu_password
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
 volumes:
   postgres_data:
+  clickhouse_data:

@@ -4,11 +4,11 @@ Cria, lista e consulta simulações executadas via Celery.
 """
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import text
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-
 from app.db import obter_sessao
 from app.models import Simulacao, SimLancamento
+from app.clickhouse import obter_cliente
 from app.schemas import SimulacaoCriar, SimulacaoLer, RespostaPadrao
 from app.tasks.simulacao_task import executar_simulacao
 
@@ -417,225 +417,266 @@ def parametros_simulacao(simulacao_id: UUID, db: Session = Depends(obter_sessao)
 
 
 @router.get("/{simulacao_id}/consolidado-faixas", summary="Dados consolidados para a tabela de faixas")
-def consolidado_faixas(simulacao_id: UUID, db: Session = Depends(obter_sessao)) -> RespostaPadrao:
+def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Depends(obter_sessao)) -> RespostaPadrao:
     """
     Retorna uma visão matricial (Categoria > Faixa > Ano) contendo a contagem de imóveis.
-    Une dados históricos da base real com os dados projetados da simulação.
+    Prioriza o ClickHouse para performance analítica.
     """
+    import logging
     from sqlalchemy import text
-    item = db.get(Simulacao, simulacao_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Simulação não encontrada.")
+    try:
+        # Tentar ClickHouse primeiro
+        ch_client = obter_cliente()
+        if ch_client:
+            try:
+                logging.info(f"Consultando faixas via ClickHouse para {simulacao_id}")
+                # Query unificada no ClickHouse (Histórico + Simulado)
+                ch_query = f"""
+                    SELECT categoria, faixa_codigo, faixa_label, exercicio, count(*) as total
+                    FROM (
+                        SELECT categoria, faixa_codigo, faixa_label, exercicio 
+                        FROM sim_lancamentos_analitico 
+                        WHERE simulacao_id = '{simulacao_id}'
+                        UNION ALL
+                        SELECT categoria, faixa_codigo, faixa_label, exercicio 
+                        FROM historico_lancamentos_analitico
+                    )
+                    GROUP BY 1, 2, 3, 4
+                """
+                resultado_ch = ch_client.query(ch_query)
+                
+                if resultado_ch.result_rows:
+                    resultado = {}
+                    labels_por_codigo = {}
+                    for row in resultado_ch.result_rows:
+                        cat, fx_cod, fx_label, ano, total = row
+                        if cat not in resultado: resultado[cat] = {}
+                        chave_cod = f"{cat}:{fx_cod}"
+                        if chave_cod not in labels_por_codigo or (not labels_por_codigo[chave_cod] and fx_label):
+                            labels_por_codigo[chave_cod] = fx_label
+                        label_final = labels_por_codigo.get(chave_cod) or fx_label or f"Faixa {fx_cod}"
+                        if label_final not in resultado[cat]:
+                            resultado[cat][label_final] = {"ordem": fx_cod, "dados": {}}
+                        resultado[cat][label_final]["dados"][ano] = total
+                    response.headers["X-Data-Source"] = "ClickHouse"
+                    return RespostaPadrao(dados=resultado)
+                else:
+                    logging.warning(f"ClickHouse retornou vazio para {simulacao_id}, recorrendo ao Postgres.")
+            except Exception as e_ch:
+                logging.error(f"Erro ao consultar ClickHouse: {e_ch}. Recorrendo ao Postgres.")
 
-    # 1. Dados Históricos (Reais)
-    historico = db.execute(text("""
-        SELECT 
-            CASE WHEN "TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
-                 WHEN "INFO_USO_LAN" = '1' THEN 'Residencial'
-                 ELSE 'Não Residencial' END AS categoria,
-            faixa_codigo,
-            faixa_label,
-            "CODG_EXERCICIO_LAN" AS ano,
-            COUNT(*) AS total
-        FROM "SIA_LANCIPTU_ASG"
-        WHERE faixa_codigo IS NOT NULL
-        GROUP BY 1, 2, 3, 4
-        ORDER BY 1, 2, 4
-    """)).mappings().all()
+        # Fallback para PostgreSQL (Lógica original otimizada)
+        item = db.get(Simulacao, simulacao_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Simulação não encontrada.")
 
-    # 2. Dados Simulados
-    simulado = db.execute(text("""
-        SELECT 
-            CASE WHEN b."TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
-                 WHEN b."INFO_USO_LAN" = '1' THEN 'Residencial'
-                 ELSE 'Não Residencial' END AS categoria,
-            s.faixa_atual AS faixa_codigo,
-            COALESCE(f.faixa_label, 'Faixa ' || s.faixa_atual) AS faixa_label,
-            s.codg_exercicio_lan AS ano,
-            COUNT(*) AS total
-        FROM sim_lancamentos s
-        JOIN "SIA_LANCIPTU_ASG" b ON s.isn_sia_lanciptu_asg = b."ISN_SIA_LANCIPTU_ASG"
-        LEFT JOIN sim_faixas_aliquota f ON (
-            f.faixa_codigo = s.faixa_atual AND 
-            f.exercicio = s.codg_exercicio_lan AND
-            f.simulacao_id = s.simulacao_id
-        )
-        WHERE s.simulacao_id = :sid
-        GROUP BY 1, 2, 3, 4
-        ORDER BY 1, 2, 4
-    """), {"sid": str(simulacao_id)}).mappings().all()
+        historico = db.execute(text("""
+            SELECT 
+                CASE WHEN "TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
+                     WHEN "INFO_USO_LAN" = '1' THEN 'Residencial'
+                     ELSE 'Não Residencial' END AS categoria,
+                faixa_codigo, faixa_label, "CODG_EXERCICIO_LAN" AS ano, COUNT(*) AS total
+            FROM "SIA_LANCIPTU_ASG"
+            WHERE faixa_codigo IS NOT NULL
+            GROUP BY 1, 2, 3, 4
+        """)).mappings().all()
 
-    # Organizar em estrutura de árvore para o frontend:
-    # { "Residencial": { "Faixa 1": { 2022: 100, 2023: 110, ... } } }
-    resultado = {}
-    # Dicionário auxiliar para manter o primeiro label encontrado para cada código
-    labels_por_codigo = {}
+        simulado = db.execute(text("""
+            SELECT 
+                CASE WHEN b."TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
+                     WHEN b."INFO_USO_LAN" = '1' THEN 'Residencial'
+                     ELSE 'Não Residencial' END AS categoria,
+                s.faixa_atual AS faixa_codigo,
+                COALESCE(f.faixa_label, 'Faixa ' || s.faixa_atual) AS faixa_label,
+                s.codg_exercicio_lan AS ano, COUNT(*) AS total
+            FROM sim_lancamentos s
+            JOIN "SIA_LANCIPTU_ASG" b ON s.isn_sia_lanciptu_asg = b."ISN_SIA_LANCIPTU_ASG"
+            LEFT JOIN sim_faixas_aliquota f ON (f.faixa_codigo = s.faixa_atual AND f.exercicio = s.codg_exercicio_lan AND f.simulacao_id = s.simulacao_id)
+            WHERE s.simulacao_id = :sid
+            GROUP BY 1, 2, 3, 4
+        """), {"sid": str(simulacao_id)}).mappings().all()
 
-    def inserir_no_mapa(rows):
-        for r in rows:
-            cat = r["categoria"]
-            fx_cod = r["faixa_codigo"]
-            fx_label = r["faixa_label"]
-            ano = r["ano"]
-            total = r["total"]
+        resultado = {}
+        labels_por_codigo = {}
+        def inserir_no_mapa(rows):
+            for r in rows:
+                cat = r["categoria"]; fx_cod = r["faixa_codigo"]; fx_label = r["faixa_label"]; ano = r["ano"]; total = r["total"]
+                if cat not in resultado: resultado[cat] = {}
+                chave_cod = f"{cat}:{fx_cod}"
+                if chave_cod not in labels_por_codigo or (not labels_por_codigo[chave_cod] and fx_label):
+                    labels_por_codigo[chave_cod] = fx_label
+                label_final = labels_por_codigo.get(chave_cod) or fx_label or f"Faixa {fx_cod}"
+                if label_final not in resultado[cat]: resultado[cat][label_final] = {"ordem": fx_cod, "dados": {}}
+                resultado[cat][label_final]["dados"][ano] = resultado[cat][label_final]["dados"].get(ano, 0) + total
 
-            if cat not in resultado:
-                resultado[cat] = {}
-            
-            # Garantir que usamos um label consistente para o mesmo código dentro da categoria
-            chave_cod = f"{cat}:{fx_cod}"
-            if chave_cod not in labels_por_codigo or (not labels_por_codigo[chave_cod] and fx_label):
-                labels_por_codigo[chave_cod] = fx_label
-            
-            label_final = labels_por_codigo.get(chave_cod) or fx_label or f"Faixa {fx_cod}"
+        inserir_no_mapa(historico)
+        inserir_no_mapa(simulado)
+        response.headers["X-Data-Source"] = "PostgreSQL"
+        return RespostaPadrao(dados=resultado)
+    except Exception as e:
+        logging.error(f"CRÍTICO: Erro em consolidado-faixas ({simulacao_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro interno ao processar faixas: {str(e)}")
 
-            if label_final not in resultado[cat]:
-                resultado[cat][label_final] = {"ordem": fx_cod, "dados": {}}
-            
-            # Acumular se por acaso houver labels diferentes mapeados para o mesmo final
-            resultado[cat][label_final]["dados"][ano] = resultado[cat][label_final]["dados"].get(ano, 0) + total
-
-    inserir_no_mapa(historico)
-    inserir_no_mapa(simulado)
-
-    return RespostaPadrao(dados=resultado)
-    
 @router.get("/{simulacao_id}/resumo-consolidado", summary="Resumo consolidado por exercício")
-def resumo_consolidado_exercicios(simulacao_id: UUID, db: Session = Depends(obter_sessao)) -> RespostaPadrao:
+def resumo_consolidado_exercicios(simulacao_id: UUID, response: Response, db: Session = Depends(obter_sessao)) -> RespostaPadrao:
     """
     Retorna o resumo financeiro e de contagem por exercício.
-    Combina o exercício base (real) com as projeções simuladas.
+    Prioriza o ClickHouse para performance analítica.
     """
+    import logging
     from sqlalchemy import text
-    item = db.get(Simulacao, simulacao_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Simulação não encontrada.")
+    try:
+        item = db.get(Simulacao, simulacao_id)
+        if not item:
+            raise HTTPException(status_code=404, detail="Simulação não encontrada.")
 
-    # 1. Dados da Base Real (Exercício Base da Simulação)
-    base_real = db.execute(text("""
-        SELECT 
-            "CODG_EXERCICIO_LAN" AS ano,
-            COUNT(*) AS total_imoveis,
-            COUNT(*) FILTER (WHERE COALESCE("INFO_POSICAO_FISCAL_LAN", 0) = 0 AND "INFO_STATUS_LAN" != '4') AS total_normal,
-            COUNT(*) FILTER (WHERE "INFO_STATUS_LAN" = '4') AS iptu_social,
-            COUNT(*) FILTER (WHERE "INFO_POSICAO_FISCAL_LAN" >= 2) AS total_isento,
-            COUNT(*) FILTER (WHERE "INFO_POSICAO_FISCAL_LAN" = 1) AS total_imune,
-            SUM("VALR_IMPOSTO_LAN") AS total_imposto
-        FROM "SIA_LANCIPTU_ASG"
-        WHERE "CODG_EXERCICIO_LAN" = :ano_base
-        GROUP BY 1
-    """), {"ano_base": item.exercicio_base}).mappings().one_or_none()
+        # Tentar ClickHouse primeiro
+        ch_client = obter_cliente()
+        if ch_client:
+            try:
+                logging.info(f"Consultando resumo via ClickHouse para {simulacao_id}")
+                ch_query = f"""
+                    SELECT exercicio, count(*) as total_imoveis,
+                           countIf(tipo_lancamento IN (0, 2)) as total_normal,
+                           countIf(tipo_lancamento = 3) as iptu_social,
+                           countIf(tipo_lancamento = 1) as total_isento,
+                           countIf(tipo_lancamento = 4) as total_imune,
+                           sum(valr_imposto) as total_imposto
+                    FROM (
+                        SELECT exercicio, tipo_lancamento, valr_imposto 
+                        FROM sim_lancamentos_analitico 
+                        WHERE simulacao_id = '{simulacao_id}'
+                        UNION ALL
+                        SELECT exercicio, tipo_lancamento, valr_imposto 
+                        FROM historico_lancamentos_analitico 
+                        WHERE exercicio = {item.exercicio_base}
+                    )
+                    GROUP BY 1
+                    ORDER BY 1
+                """
+                resultado_ch = ch_client.query(ch_query)
+                if resultado_ch.result_rows:
+                    resumo = []
+                    for row in resultado_ch.result_rows:
+                        resumo.append({
+                            "ano": row[0], "total_imoveis": row[1], "total_normal": row[2],
+                            "iptu_social": row[3], "total_isento": row[4], "total_imune": row[5],
+                            "total_imposto": float(row[6])
+                        })
+                    response.headers["X-Data-Source"] = "ClickHouse"
+                    return RespostaPadrao(dados=resumo)
+            except Exception as e_ch:
+                logging.error(f"Erro ao consultar resumo no ClickHouse: {e_ch}. Recorrendo ao Postgres.")
 
-    # 2. Dados Simulados
-    simulado = db.execute(text("""
-        SELECT 
-            codg_exercicio_lan AS ano,
-            COUNT(*) AS total_imoveis,
-            COUNT(*) FILTER (WHERE tipo_lancamento IN (0, 2)) AS total_normal,
-            COUNT(*) FILTER (WHERE tipo_lancamento = 3) AS iptu_social,
-            COUNT(*) FILTER (WHERE tipo_lancamento = 1) AS total_isento,
-            COUNT(*) FILTER (WHERE tipo_lancamento = 4) AS total_imune,
-            SUM(valr_imposto_final) AS total_imposto
-        FROM sim_lancamentos
-        WHERE simulacao_id = :sid
-        GROUP BY 1
-        ORDER BY 1
-    """), {"sid": str(simulacao_id)}).mappings().all()
+        # Fallback para PostgreSQL
+        base_real = db.execute(text("""
+            SELECT 
+                "CODG_EXERCICIO_LAN" AS ano, COUNT(*) AS total_imoveis,
+                COUNT(*) FILTER (WHERE COALESCE("INFO_POSICAO_FISCAL_LAN", 0) = 0 AND "INFO_STATUS_LAN" != '4') AS total_normal,
+                COUNT(*) FILTER (WHERE "INFO_STATUS_LAN" = '4') AS iptu_social,
+                COUNT(*) FILTER (WHERE "INFO_POSICAO_FISCAL_LAN" >= 2) AS total_isento,
+                COUNT(*) FILTER (WHERE "INFO_POSICAO_FISCAL_LAN" = 1) AS total_imune,
+                SUM("VALR_IMPOSTO_LAN") AS total_imposto
+            FROM "SIA_LANCIPTU_ASG"
+            WHERE "CODG_EXERCICIO_LAN" = :ano_base
+            GROUP BY 1
+        """), {"ano_base": item.exercicio_base}).mappings().one_or_none()
 
-    resumo = []
-    if base_real:
-        resumo.append(dict(base_real))
-    
-    for r in simulado:
-        resumo.append(dict(r))
+        simulado = db.execute(text("""
+            SELECT 
+                codg_exercicio_lan AS ano, COUNT(*) AS total_imoveis,
+                COUNT(*) FILTER (WHERE tipo_lancamento IN (0, 2)) AS total_normal,
+                COUNT(*) FILTER (WHERE tipo_lancamento = 3) AS iptu_social,
+                COUNT(*) FILTER (WHERE tipo_lancamento = 1) AS total_isento,
+                COUNT(*) FILTER (WHERE tipo_lancamento = 4) AS total_imune,
+                SUM(valr_imposto_final) AS total_imposto
+            FROM sim_lancamentos
+            WHERE simulacao_id = :sid
+            GROUP BY 1
+            ORDER BY 1
+        """), {"sid": str(simulacao_id)}).mappings().all()
 
-    return RespostaPadrao(dados=resumo)
+        resumo = []
+        if base_real: resumo.append(dict(base_real))
+        for r in simulado: resumo.append(dict(r))
+        response.headers["X-Data-Source"] = "PostgreSQL"
+        return RespostaPadrao(dados=resumo)
+    except Exception as e:
+        logging.error(f"CRÍTICO: Erro em resumo-consolidado ({simulacao_id}): {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/{simulacao_id}/distribuicao-edificacao")
 def distribuicao_edificacao_sim(
     simulacao_id: UUID,
+    response: Response,
     exercicio: int = Query(...),
     db: Session = Depends(obter_sessao)
 ):
-    """Retorna matriz de Tipo de Edificação x Tipo de Lançamento para uma simulação."""
+    """
+    Retorna matriz de Tipo de Edificação x Tipo de Lançamento para uma simulação.
+    Prioriza ClickHouse para performance analítica.
+    """
+    import logging
+    from sqlalchemy import text
     try:
+        # Tentar ClickHouse primeiro
+        ch_client = obter_cliente()
+        if ch_client:
+            try:
+                logging.info(f"Consultando distribuição por edificação via ClickHouse para {simulacao_id}")
+                ch_query = f"""
+                    SELECT tipo_edificacao, tipo_lancamento, count(*) as quantidade
+                    FROM sim_lancamentos_analitico
+                    WHERE simulacao_id = '{simulacao_id}' AND exercicio = {exercicio}
+                    GROUP BY 1, 2
+                    ORDER BY 1, 2
+                """
+                resultado_ch = ch_client.query(ch_query)
+                if resultado_ch.result_rows:
+                    matriz = {}
+                    for row in resultado_ch.result_rows:
+                        edf, t_lan, qtd = row
+                        lan_label = {0: "Normal", 1: "Isento", 2: "Imposto Mínimo", 3: "IPTU Social", 4: "Imunidade"}.get(t_lan, "Outros")
+                        if edf not in matriz:
+                            matriz[edf] = {"Normal": 0, "Isento": 0, "Imposto Mínimo": 0, "IPTU Social": 0, "Imunidade": 0}
+                        if lan_label in matriz[edf]:
+                            matriz[edf][lan_label] = int(qtd)
+                    response.headers["X-Data-Source"] = "ClickHouse"
+                    return RespostaPadrao(dados=matriz)
+            except Exception as e_ch:
+                logging.error(f"Erro ao consultar ClickHouse (edificacao): {e_ch}. Recorrendo ao Postgres.")
+
+        # Fallback para PostgreSQL (Query pesada)
         query = text("""
             WITH tipos AS (
-                SELECT 
-                    "ISN_SIA_LANCIPTU_ASG",
-                    STRING_AGG(
-                        CASE "INFO_TIPO_EDF_LAN"
-                            WHEN 1 THEN 'Casa'
-                            WHEN 2 THEN 'Apartamento'
-                            WHEN 3 THEN 'Barracão'
-                            WHEN 4 THEN 'Loja'
-                            WHEN 5 THEN 'Sala/Escritório'
-                            WHEN 6 THEN 'Galpão Comum'
-                            WHEN 7 THEN 'Galpão Industrial'
-                            WHEN 8 THEN 'Telheiro'
-                            WHEN 9 THEN 'Edificacao em Altura'
-                            WHEN 10 THEN 'Especial'
-                            WHEN 11 THEN 'Garagem'
-                            WHEN 12 THEN 'Condomínio'
-                            WHEN 13 THEN 'Escaninho'
-                            WHEN 14 THEN 'Sobrado'
-                            ELSE 'Não Mapeado'
-                        END,
-                        ' / '
-                        ORDER BY cnxarraycolumn
-                    ) AS tipo_edificacao
-                FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
-                GROUP BY 1
+                SELECT "ISN_SIA_LANCIPTU_ASG",
+                    STRING_AGG(CASE "INFO_TIPO_EDF_LAN"
+                        WHEN 1 THEN 'Casa' WHEN 2 THEN 'Apartamento' WHEN 3 THEN 'Barracão'
+                        WHEN 4 THEN 'Loja' WHEN 5 THEN 'Sala/Escritório' WHEN 6 THEN 'Galpão Comum'
+                        WHEN 7 THEN 'Galpão Industrial' WHEN 8 THEN 'Telheiro' WHEN 9 THEN 'Edificacao em Altura'
+                        WHEN 10 THEN 'Especial' WHEN 11 THEN 'Garagem' WHEN 12 THEN 'Condomínio'
+                        WHEN 13 THEN 'Escaninho' WHEN 14 THEN 'Sobrado' ELSE 'Não Mapeado'
+                    END, ' / ' ORDER BY cnxarraycolumn) AS tipo_edificacao
+                FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" GROUP BY 1
             )
-            SELECT 
-                COALESCE(t.tipo_edificacao, 
-                    CASE l."INFO_USO_LAN"
-                        WHEN 1 THEN 'Residencial'
-                        WHEN 2 THEN 'Não Residencial'
-                        ELSE 'Territorial'
-                    END
-                ) AS tipo_edificacao,
-                s.tipo_lancamento,
-                COUNT(*) AS quantidade
+            SELECT COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
+                   s.tipo_lancamento, COUNT(*) AS quantidade
             FROM sim_lancamentos s
             JOIN "SIA_LANCIPTU_ASG" l ON s.isn_sia_lanciptu_asg = l."ISN_SIA_LANCIPTU_ASG"
             LEFT JOIN tipos t ON s.isn_sia_lanciptu_asg = t."ISN_SIA_LANCIPTU_ASG"
             WHERE s.simulacao_id = :sid AND s.codg_exercicio_lan = :ano
-            GROUP BY 1, 2
-            ORDER BY 1, 2
+            GROUP BY 1, 2 ORDER BY 1, 2
         """)
-        
-        resultados = db.execute(query, {
-            "sid": str(simulacao_id),
-            "ano": exercicio
-        }).mappings().all()
-        
+        resultados = db.execute(query, {"sid": str(simulacao_id), "ano": exercicio}).mappings().all()
         matriz = {}
         for r in resultados:
-            edf = r["tipo_edificacao"]
-            tipo_lan = int(r["tipo_lancamento"] or 0)
-            lan_label = {
-                0: "Normal", 
-                1: "Isento", 
-                2: "Imposto Mínimo", 
-                3: "IPTU Social",
-                4: "Imunidade"
-            }.get(tipo_lan, "Outros")
-            
+            edf = r["tipo_edificacao"]; t_lan = int(r["tipo_lancamento"] or 0)
+            lan_label = {0: "Normal", 1: "Isento", 2: "Imposto Mínimo", 3: "IPTU Social", 4: "Imunidade"}.get(t_lan, "Outros")
             if edf not in matriz:
-                matriz[edf] = {
-                    "Normal": 0, 
-                    "Isento": 0, 
-                    "Imposto Mínimo": 0, 
-                    "IPTU Social": 0,
-                    "Imunidade": 0
-                }
-            
-            if lan_label in matriz[edf]:
-                matriz[edf][lan_label] = int(r["quantidade"])
-            
+                matriz[edf] = {"Normal": 0, "Isento": 0, "Imposto Mínimo": 0, "IPTU Social": 0, "Imunidade": 0}
+            if lan_label in matriz[edf]: matriz[edf][lan_label] = int(r["quantidade"])
+        response.headers["X-Data-Source"] = "PostgreSQL"
         return RespostaPadrao(dados=matriz)
     except Exception as e:
-        import logging
         logging.error(f"Erro na distribuição por edificação (sim): {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -23,6 +23,9 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=iptu_password
     volumes:
       - /opt/dados_iptu:/data
     networks:
@@ -52,6 +55,9 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=iptu_password
     volumes:
       - /opt/dados_iptu:/data
     networks:
@@ -78,6 +84,27 @@ services:
         - "traefik.http.routers.laniptu-front-v5.tls=true"
         - "traefik.http.routers.laniptu-front-v5.tls.certresolver=myresolver"
         - "traefik.http.services.laniptu-front-v5.loadbalancer.server.port=3000"
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: iptu_clickhouse
+    restart: always
+    environment:
+      - CLICKHOUSE_DB=lancamento_iptu
+      - CLICKHOUSE_USER=admin
+      - CLICKHOUSE_PASSWORD=iptu_password
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+    volumes:
+      - clickhouse_prod_data:/var/lib/clickhouse
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - net
+
+volumes:
+  clickhouse_prod_data:
 
 networks:
   net:
