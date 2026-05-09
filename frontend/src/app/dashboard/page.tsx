@@ -114,7 +114,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
           d={pathD} 
           fill="none" 
           stroke="#0e4f66" 
-          strokeWidth="3" 
+          strokeWidth="1.5" 
           strokeLinecap="round" 
           strokeLinejoin="round" 
           style={{ transition: "all 0.3s" }}
