@@ -4,8 +4,10 @@ import time
 import io
 import csv
 
-# Conexão (ajustada para ambiente local acessando container)
-engine = create_engine('postgresql://iptu_user:iptu_password@db:5432/lancamento-iptu')
+import os
+# Conexão dinâmica (usa DATABASE_URL se existir, senão usa o padrão local)
+db_url = os.getenv('DATABASE_URL', 'postgresql://iptu_user:iptu_password@db:5432/lancamento-iptu')
+engine = create_engine(db_url)
 
 # Mapeamento completo: (aliquota_arredondada, tipo_imposto, residencial_flag) -> (codigo, label, ordem)
 # Multiplicamos a alíquota por 10000 para converter para inteiro (ex: 0.0015 -> 15, 0.0100 -> 100)
