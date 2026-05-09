@@ -22,6 +22,18 @@ def obter_cliente():
         logging.error(f"Erro ao conectar no ClickHouse: {e}")
         return None
 
+def consultar_clickhouse(query, params=None):
+    """Executa uma consulta no ClickHouse e retorna os resultados como lista de dicts."""
+    client = obter_cliente()
+    if not client:
+        return []
+    try:
+        resultado = client.query(query, parameters=params)
+        return [dict(zip(resultado.column_names, row)) for row in resultado.result_rows]
+    except Exception as e:
+        logging.error(f"Erro ao consultar ClickHouse: {e}")
+        return []
+
 def inicializar_clickhouse():
     """Cria as tabelas analíticas no ClickHouse caso não existam."""
     client = obter_cliente()
