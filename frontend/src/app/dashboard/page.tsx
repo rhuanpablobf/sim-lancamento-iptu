@@ -114,7 +114,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
           d={pathD} 
           fill="none" 
           stroke="#0e4f66" 
-          strokeWidth={lineWidth} 
+          strokeWidth={lineWidth * 0.75} 
           strokeLinecap="round" 
           strokeLinejoin="round" 
           style={{ transition: "all 0.3s" }}
@@ -135,7 +135,7 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               <circle 
                 cx={p.x} 
                 cy={p.y} 
-                r={isAtivo ? 2 : 1.2} 
+                r={isAtivo ? 1.5 : 0.9} 
                 fill={isAtivo ? "#0e4f66" : "#fff"} 
                 stroke="#0e4f66" 
                 strokeWidth="2" 
@@ -476,7 +476,7 @@ export default function DashboardPage() {
                 dados={(d?.arrecadacao_historica || []).filter((h: any) => anosGraficoVisiveis.includes(h.exercicio))} 
                 valorKey="valor"
                 moeda={true} 
-                height={110} 
+                height={80} 
                 anoAtivo={anoSelecionado}
                 fontScale={0.5} // Redução de 50% na fonte
               />

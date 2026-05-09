@@ -457,20 +457,27 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
                 
                 if resultado_ch.result_rows:
                     resultado = {}
+                    labels_por_codigo = {}
+                    # Primeiro passo: mapear os melhores labels por código
                     for row in resultado_ch.result_rows:
                         cat, fx_cod, fx_label, ano, total = row
-                        
-                        # Limpar labels com ???
+                        chave_cod = f"{cat}:{fx_cod}"
                         if fx_label and "???" in fx_label:
                             fx_label = fx_label.split("???")[-1].strip()
+                        if fx_label and (chave_cod not in labels_por_codigo or len(fx_label) > len(labels_por_codigo[chave_cod])):
+                            labels_por_codigo[chave_cod] = fx_label
+
+                    # Segundo passo: agrupar os dados usando os labels consistentes
+                    for row in resultado_ch.result_rows:
+                        cat, fx_cod, fx_label, ano, total = row
+                        label_final = labels_por_codigo.get(f"{cat}:{fx_cod}") or fx_label or f"Faixa {fx_cod}"
                         
-                        label_final = fx_label or f"Faixa {fx_cod}"
                         if cat not in resultado: resultado[cat] = {}
                         if label_final not in resultado[cat]:
                             resultado[cat][label_final] = {"ordem": int(fx_cod or 0), "dados": {}}
-                        resultado[cat][label_final]["dados"][ano] = total
+                        resultado[cat][label_final]["dados"][ano] = resultado[cat][label_final]["dados"].get(ano, 0) + total
                     
-                    # Garantir ordenação numérica das faixas
+                    # Ordenação final
                     for cat in resultado:
                         resultado[cat] = dict(sorted(resultado[cat].items(), key=lambda x: x[1]["ordem"]))
 
@@ -513,12 +520,20 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
         """), {"sid": str(simulacao_id)}).mappings().all()
 
         resultado = {}
+        labels_por_codigo = {}
+        # Mapear labels consistentes para o Postgres também
+        for r in list(historico) + list(simulado):
+            cat = r["categoria"]; fx_cod = r["faixa_codigo"]; fx_label = r["faixa_label"]
+            chave_cod = f"{cat}:{fx_cod}"
+            if fx_label and "???" in fx_label:
+                fx_label = fx_label.split("???")[-1].strip()
+            if fx_label and (chave_cod not in labels_por_codigo or len(fx_label) > len(labels_por_codigo.get(chave_cod, ""))):
+                labels_por_codigo[chave_cod] = fx_label
+
         def inserir_no_mapa(rows):
             for r in rows:
                 cat = r["categoria"]; fx_cod = r["faixa_codigo"]; fx_label = r["faixa_label"]; ano = r["ano"]; total = r["total"]
-                if fx_label and "???" in fx_label:
-                    fx_label = fx_label.split("???")[-1].strip()
-                label_final = fx_label or f"Faixa {fx_cod}"
+                label_final = labels_por_codigo.get(f"{cat}:{fx_cod}") or fx_label or f"Faixa {fx_cod}"
                 if cat not in resultado: resultado[cat] = {}
                 if label_final not in resultado[cat]:
                     resultado[cat][label_final] = {"ordem": int(fx_cod or 0), "dados": {}}
@@ -527,7 +542,6 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
         inserir_no_mapa(historico)
         inserir_no_mapa(simulado)
 
-        # Ordenar Postgres Fallback também
         for cat in resultado:
             resultado[cat] = dict(sorted(resultado[cat].items(), key=lambda x: x[1]["ordem"]))
 
