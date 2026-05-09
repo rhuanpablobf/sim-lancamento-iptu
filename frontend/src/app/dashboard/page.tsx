@@ -135,10 +135,10 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               <circle 
                 cx={p.x} 
                 cy={p.y} 
-                r={isAtivo ? 1.5 : 0.9} 
+                r={(isAtivo ? 1.5 : 0.9) * lineWidth * 0.75} 
                 fill={isAtivo ? "#0e4f66" : "#fff"} 
                 stroke="#0e4f66" 
-                strokeWidth="2" 
+                strokeWidth={1.5 * lineWidth * 0.75} 
                 style={{ cursor: "pointer", transition: "all 0.2s" }}
               />
               {/* Variação % acima do ponto */}

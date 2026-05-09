@@ -472,9 +472,15 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
                         cat, fx_cod, fx_label, ano, total = row
                         label_final = labels_por_codigo.get(f"{cat}:{fx_cod}") or fx_label or f"Faixa {fx_cod}"
                         
+                        # Conversão segura de faixa_codigo para ordenação
+                        try:
+                            ordem_num = int(fx_cod) if fx_cod and str(fx_cod).isdigit() else 999
+                        except (ValueError, TypeError):
+                            ordem_num = 999
+                        
                         if cat not in resultado: resultado[cat] = {}
                         if label_final not in resultado[cat]:
-                            resultado[cat][label_final] = {"ordem": int(fx_cod or 0), "dados": {}}
+                            resultado[cat][label_final] = {"ordem": ordem_num, "dados": {}}
                         resultado[cat][label_final]["dados"][ano] = resultado[cat][label_final]["dados"].get(ano, 0) + total
                     
                     # Ordenação final
@@ -534,9 +540,15 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
             for r in rows:
                 cat = r["categoria"]; fx_cod = r["faixa_codigo"]; fx_label = r["faixa_label"]; ano = r["ano"]; total = r["total"]
                 label_final = labels_por_codigo.get(f"{cat}:{fx_cod}") or fx_label or f"Faixa {fx_cod}"
+                # Conversão segura de faixa_codigo para ordenação (Postgres)
+                try:
+                    ordem_num = int(fx_cod) if fx_cod and str(fx_cod).isdigit() else 999
+                except (ValueError, TypeError):
+                    ordem_num = 999
+                
                 if cat not in resultado: resultado[cat] = {}
                 if label_final not in resultado[cat]:
-                    resultado[cat][label_final] = {"ordem": int(fx_cod or 0), "dados": {}}
+                    resultado[cat][label_final] = {"ordem": ordem_num, "dados": {}}
                 resultado[cat][label_final]["dados"][ano] = resultado[cat][label_final]["dados"].get(ano, 0) + total
 
         inserir_no_mapa(historico)
