@@ -472,11 +472,21 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
                         cat, fx_cod, fx_label, ano, total = row
                         label_final = labels_por_codigo.get(f"{cat}:{fx_cod}") or fx_label or f"Faixa {fx_cod}"
                         
-                        # Conversão segura de faixa_codigo para ordenação
+                        # Extração numérica robusta de faixa_codigo para ordenação
+                        ordem_num = 9999
                         try:
-                            ordem_num = int(fx_cod) if fx_cod and str(fx_cod).isdigit() else 999
-                        except (ValueError, TypeError):
-                            ordem_num = 999
+                            if fx_cod is not None:
+                                s_cod = str(fx_cod).strip()
+                                if s_cod.isdigit():
+                                    ordem_num = int(s_cod)
+                                else:
+                                    # Tenta extrair apenas os dígitos caso venha algo como "Faixa 1" no código
+                                    import re
+                                    digitos = re.findall(r'\d+', s_cod)
+                                    if digitos:
+                                        ordem_num = int(digitos[0])
+                        except:
+                            pass
                         
                         if cat not in resultado: resultado[cat] = {}
                         if label_final not in resultado[cat]:
@@ -540,11 +550,20 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
             for r in rows:
                 cat = r["categoria"]; fx_cod = r["faixa_codigo"]; fx_label = r["faixa_label"]; ano = r["ano"]; total = r["total"]
                 label_final = labels_por_codigo.get(f"{cat}:{fx_cod}") or fx_label or f"Faixa {fx_cod}"
-                # Conversão segura de faixa_codigo para ordenação (Postgres)
+                # Extração numérica robusta de faixa_codigo para ordenação (Postgres)
+                ordem_num = 9999
                 try:
-                    ordem_num = int(fx_cod) if fx_cod and str(fx_cod).isdigit() else 999
-                except (ValueError, TypeError):
-                    ordem_num = 999
+                    if fx_cod is not None:
+                        s_cod = str(fx_cod).strip()
+                        if s_cod.isdigit():
+                            ordem_num = int(s_cod)
+                        else:
+                            import re
+                            digitos = re.findall(r'\d+', s_cod)
+                            if digitos:
+                                ordem_num = int(digitos[0])
+                except:
+                    pass
                 
                 if cat not in resultado: resultado[cat] = {}
                 if label_final not in resultado[cat]:
