@@ -220,7 +220,8 @@ export default function DashboardPage() {
 
   const { data, error, isLoading } = useSWR(
     (contexto === "base" || (contexto !== "base" && anoSelecionado)) ? urlDashboard : null,
-    fetcher
+    fetcher,
+    { keepPreviousData: true }
   );
 
   const d = data?.dados;
@@ -231,7 +232,7 @@ export default function DashboardPage() {
     ? "/api/importacao/dashboard/consolidado-faixas"
     : `/api/simulacoes/${contexto}/consolidado-faixas`;
 
-  const { data: respConsolidado } = useSWR(urlConsolidado, fetcher);
+  const { data: respConsolidado } = useSWR(urlConsolidado, fetcher, { keepPreviousData: true });
   const consolidado = respConsolidado?.dados || {};
 
   const urlEdificacao = contexto === "base"
@@ -240,7 +241,8 @@ export default function DashboardPage() {
 
   const { data: respEdificacao } = useSWR<{ dados: MatrizEdificacao }>(
     anoSelecionado ? urlEdificacao : null, 
-    fetcher
+    fetcher,
+    { keepPreviousData: true }
   );
   const matrizEdf = respEdificacao?.dados || {};
   const { data: respResumo } = useSWR(
