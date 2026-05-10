@@ -388,11 +388,11 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             "arrecadacao_historica": [{"exercicio": h["exercicio"], "valor": float(h["valor_total"]), "imoveis": h["total_imoveis"]} for h in historico_geral],
             "volume_historico": [{"exercicio": h["exercicio"], "total": h["total_imoveis"]} for h in historico_geral],
             "series": {
-                "social": [{"exercicio": h["exercicio"], "valor": int(h["iptu_social"])} for h in historico_geral],
-                "isentos": [{"exercicio": h["exercicio"], "valor": int(h["isentos"])} for h in historico_geral],
-                "imunes": [{"exercicio": h["exercicio"], "valor": int(h["imunes"])} for h in historico_geral],
-                "minimo": [{"exercicio": h["exercicio"], "valor": int(h["imposto_minimo"])} for h in historico_geral],
-                "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in historico_geral]
+                "social": [{"exercicio": h["exercicio"], "valor": int(h.get("social", 0) or 0)} for h in historico_geral],
+                "isentos": [{"exercicio": h["exercicio"], "valor": int(h.get("isentos", 0) or 0)} for h in historico_geral],
+                "imunes": [{"exercicio": h["exercicio"], "valor": int(h.get("imunes", 0) or 0)} for h in historico_geral],
+                "minimo": [{"exercicio": h["exercicio"], "valor": int(h.get("imposto_minimo", 0) or 0)} for h in historico_geral],
+                "normal": [{"exercicio": h["exercicio"], "valor": int(h.get("normal", 0) or 0)} for h in historico_geral]
             }
         })
     except Exception as e:
