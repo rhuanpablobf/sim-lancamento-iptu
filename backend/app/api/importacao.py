@@ -319,7 +319,7 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                     COUNT(*) AS total_imoveis,
                     COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 0) AS normal,
                     COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1) AS isentos,
-                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS minimo,
                     COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3) AS social,
                     COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 4) AS imunes,
                     COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valor_total
@@ -351,7 +351,7 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 SELECT exercicio, count() AS total_imoveis, 
                        countIf(tipo_lancamento = 0) AS normal,
                        countIf(tipo_lancamento = 1) AS isentos,
-                       countIf(tipo_lancamento = 2) AS imposto_minimo,
+                       countIf(tipo_lancamento = 2) AS minimo,
                        countIf(tipo_lancamento = 3) AS social,
                        countIf(tipo_lancamento = 4) AS imunes,
                        sum(valr_imposto) AS valor_total
@@ -386,12 +386,12 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             "faixas": [dict(r) for r in faixas],
             "iptu_social_historico": iptu_social_serie,
             "arrecadacao_historica": [{"exercicio": h["exercicio"], "valor": float(h["valor_total"]), "imoveis": h["total_imoveis"]} for h in historico_geral],
-            "volume_historico": [{"exercicio": h["exercicio"], "total": h["total_imoveis"]} for h in historico_geral],
+            "volume_historico": [{"exercicio": h["exercicio"], "total": h["total_imoveis"], "normal": h["normal"], "social": h["social"], "isentos": h["isentos"], "imunes": h["imunes"], "minimo": h["minimo"]} for h in historico_geral],
             "series": {
                 "social": [{"exercicio": h["exercicio"], "valor": int(h.get("social", 0) or 0)} for h in historico_geral],
                 "isentos": [{"exercicio": h["exercicio"], "valor": int(h.get("isentos", 0) or 0)} for h in historico_geral],
                 "imunes": [{"exercicio": h["exercicio"], "valor": int(h.get("imunes", 0) or 0)} for h in historico_geral],
-                "minimo": [{"exercicio": h["exercicio"], "valor": int(h.get("imposto_minimo", 0) or 0)} for h in historico_geral],
+                "minimo": [{"exercicio": h["exercicio"], "valor": int(h.get("minimo", 0) or 0)} for h in historico_geral],
                 "normal": [{"exercicio": h["exercicio"], "valor": int(h.get("normal", 0) or 0)} for h in historico_geral]
             }
         })

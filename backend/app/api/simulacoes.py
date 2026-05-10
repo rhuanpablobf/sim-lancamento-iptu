@@ -362,7 +362,7 @@ def dashboard_simulacao(
                 count() AS total, 
                 countIf(tipo_lancamento = 0) AS normal,
                 countIf(tipo_lancamento = 1) AS isentos,
-                countIf(tipo_lancamento = 2) AS imposto_minimo,
+                countIf(tipo_lancamento = 2) AS minimo,
                 countIf(tipo_lancamento = 3) AS social,
                 countIf(tipo_lancamento = 4) AS imunes
             FROM (
@@ -375,7 +375,7 @@ def dashboard_simulacao(
             "social": [{"exercicio": h["exercicio"], "valor": int(h["social"])} for h in v_hist],
             "isentos": [{"exercicio": h["exercicio"], "valor": int(h["isentos"])} for h in v_hist],
             "imunes": [{"exercicio": h["exercicio"], "valor": int(h["imunes"])} for h in v_hist],
-            "minimo": [{"exercicio": h["exercicio"], "valor": int(h["imposto_minimo"])} for h in v_hist],
+            "minimo": [{"exercicio": h["exercicio"], "valor": int(h["minimo"])} for h in v_hist],
             "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in v_hist]
         }
     })
