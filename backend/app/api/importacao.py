@@ -265,12 +265,14 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
         dados_click = consultar_clickhouse("""
             SELECT 
                 count() AS total_imoveis,
+                countIf(tipo_lancamento = 0) AS normal,
                 countIf(tipo_lancamento = 1) AS isentos,
-                countIf(tipo_lancamento = 4) AS imunes,
                 countIf(tipo_lancamento = 2) AS imposto_minimo,
                 countIf(tipo_lancamento = 3) AS iptu_social,
+                countIf(tipo_lancamento = 4) AS imunes,
                 countIf(categoria = 'Residencial') AS predial,
                 countIf(categoria = 'Territorial') AS territorial,
+                sum(valr_venal_total) AS valr_venal_total,
                 sum(valr_imposto) AS valr_imposto_total
             FROM lancamento_iptu.historico_lancamentos_analitico
             WHERE exercicio = {ex:UInt16}
@@ -321,9 +323,6 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
         else:
             # Usa dados do ClickHouse para o restante das queries (MUITO RÁPIDO)
             kpis = dados_click[0]
-            # No ClickHouse, adicionamos campos que o front espera mas o CH não calculou acima
-            kpis['valr_venal_total'] = 0 # Otimização: venal não é usado no KPI principal
-            kpis['aliquota_media'] = 0
 
             categorias = consultar_clickhouse("""
                 SELECT categoria, count() AS total, sum(valr_imposto) AS imposto_total
@@ -385,44 +384,40 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
 def distribuicao_aliquotas(anos: str = Query(None), db: Session = Depends(obter_sessao)):
     """Retorna a contagem de imóveis por faixa de alíquota, agrupado por categoria e exercício."""
     try:
+        from app.clickhouse import consultar_clickhouse
         lista_anos = [int(a) for a in anos.split(",")] if anos else []
         
-        # Se não informou anos, pega os últimos 8
+        # Se não informou anos, tenta pegar do CH os últimos 8
         if not lista_anos:
-            row_anos = db.execute(text('SELECT DISTINCT CAST("CODG_EXERCICIO_LAN" AS INTEGER) AS ano FROM "SIA_LANCIPTU_ASG" ORDER BY 1 DESC LIMIT 8')).mappings().all()
-            lista_anos = sorted([r["ano"] for r in row_anos])
+            row_anos = consultar_clickhouse('SELECT DISTINCT exercicio FROM lancamento_iptu.historico_lancamentos_analitico ORDER BY exercicio DESC LIMIT 8', {})
+            lista_anos = sorted([r["exercicio"] for r in row_anos])
         
         if not lista_anos:
             return RespostaPadrao(dados={"anos": [], "categorias": []})
 
-        # Query para pegar a distribuição por Categoria, Faixa e Ano
-        query = text("""
+        # Query ClickHouse para pegar a distribuição por Categoria, Faixa e Ano
+        # Nota: faixa_label e faixa_ordem fake baseados no código se não existirem
+        resultados = consultar_clickhouse("""
             SELECT 
-                CASE WHEN "TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
-                     WHEN "INFO_USO_LAN" = '1' THEN 'Residencial'
-                     ELSE 'Não Residencial' END AS categoria,
+                categoria,
                 faixa_codigo, 
                 faixa_label, 
-                faixa_ordem,
-                CAST("CODG_EXERCICIO_LAN" AS INTEGER) AS ano,
-                COUNT(*) AS total
-            FROM "SIA_LANCIPTU_ASG" 
-            WHERE "CODG_EXERCICIO_LAN" IN :anos AND faixa_codigo IS NOT NULL
-            GROUP BY 1, 2, 3, 4, 5
-            ORDER BY 1, 4, 5
-        """)
+                exercicio AS ano,
+                count() AS total
+            FROM lancamento_iptu.historico_lancamentos_analitico
+            WHERE exercicio IN {anos:Array(UInt16)}
+            GROUP BY categoria, faixa_codigo, faixa_label, exercicio
+            ORDER BY categoria, faixa_codigo, exercicio
+        """, {"anos": lista_anos})
         
-        anos_str = [str(a) for a in lista_anos]
-        resultados = db.execute(query, {"anos": tuple(anos_str)}).mappings().all()
-        
-        # Estruturar os dados: Categoria -> (Codigo, Label, Ordem) -> Ano -> Total
+        # Estruturar os dados: Categoria -> (Codigo, Label) -> Ano -> Total
         categorias_dict = {}
         for r in resultados:
             cat = r["categoria"]
             if cat not in categorias_dict:
                 categorias_dict[cat] = {}
             
-            f_key = (r["faixa_codigo"], r["faixa_label"], r["faixa_ordem"])
+            f_key = (r["faixa_codigo"], r["faixa_label"], r["faixa_codigo"]) # ordem = codigo para CH
             if f_key not in categorias_dict[cat]:
                 categorias_dict[cat][f_key] = {ano: 0 for ano in lista_anos}
             

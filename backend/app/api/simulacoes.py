@@ -259,9 +259,11 @@ def dashboard_simulacao(
     kpis_click = consultar_clickhouse("""
         SELECT 
             count() AS total_imoveis,
+            countIf(tipo_lancamento = 0) AS normal,
             countIf(tipo_lancamento = 1) AS isentos,
             countIf(tipo_lancamento = 2) AS imposto_minimo,
             countIf(tipo_lancamento = 3) AS iptu_social,
+            countIf(tipo_lancamento = 4) AS imunes,
             sum(valr_venal_simulado) AS valr_venal_total,
             sum(valr_imposto) AS valr_imposto_total,
             sum(valr_imposto_anterior) AS valr_imposto_base,
