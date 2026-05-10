@@ -128,10 +128,7 @@ def sincronizar_historico_para_clickhouse(db_session):
                  ELSE 'Não Residencial' END AS categoria,
             COALESCE(s.faixa_codigo, '0') AS faixa_codigo,
             COALESCE(s.faixa_label, 'Sem Faixa') AS faixa_label,
-            CASE WHEN s."INFO_STATUS_LAN" = '4' THEN 3 -- Social
-                 WHEN s."INFO_POSICAO_FISCAL_LAN" >= 2 THEN 1 -- Isento
-                 WHEN s."INFO_POSICAO_FISCAL_LAN" = 1 THEN 4 -- Imune
-                 ELSE 0 END AS tipo_lancamento,
+            COALESCE(s."TIPO_LANCAMENTO_LAN", 0) AS tipo_lancamento,
             COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
             COALESCE(s."VALR_IMPOSTO_LAN", 0) AS valr_imposto,
             COALESCE(s."VALR_VENAL_LAN", 0) AS valr_venal_total
