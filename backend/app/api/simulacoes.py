@@ -356,14 +356,28 @@ def dashboard_simulacao(
                 SELECT exercicio, valr_imposto FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
             ) GROUP BY exercicio ORDER BY exercicio
         """, {"sid": str(simulacao_id)}),
-        "volume_historico": consultar_clickhouse("""
-            SELECT exercicio, count() AS total, countIf(tipo_lancamento = 3) AS social, countIf(tipo_lancamento = 1) AS isentos
+        "volume_historico": (v_hist := consultar_clickhouse("""
+            SELECT 
+                exercicio, 
+                count() AS total, 
+                countIf(tipo_lancamento = 0) AS normal,
+                countIf(tipo_lancamento = 1) AS isentos,
+                countIf(tipo_lancamento = 2) AS imposto_minimo,
+                countIf(tipo_lancamento = 3) AS social,
+                countIf(tipo_lancamento = 4) AS imunes
             FROM (
                 SELECT exercicio, tipo_lancamento FROM lancamento_iptu.historico_lancamentos_analitico
                 UNION ALL
                 SELECT exercicio, tipo_lancamento FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
             ) GROUP BY exercicio ORDER BY exercicio
-        """, {"sid": str(simulacao_id)})
+        """, {"sid": str(simulacao_id)})),
+        "series": {
+            "social": [{"exercicio": h["exercicio"], "valor": int(h["social"])} for h in v_hist],
+            "isentos": [{"exercicio": h["exercicio"], "valor": int(h["isentos"])} for h in v_hist],
+            "imunes": [{"exercicio": h["exercicio"], "valor": int(h["imunes"])} for h in v_hist],
+            "minimo": [{"exercicio": h["exercicio"], "valor": int(h["imposto_minimo"])} for h in v_hist],
+            "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in v_hist]
+        }
     })
 
 
@@ -424,11 +438,11 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
                     SELECT categoria, faixa_codigo, faixa_label, exercicio, count(*) as total
                     FROM (
                         SELECT categoria, faixa_codigo, faixa_label, exercicio 
-                        FROM sim_lancamentos_analitico 
+                        FROM lancamento_iptu.sim_lancamentos_analitico 
                         WHERE simulacao_id = '{simulacao_id}'
                         UNION ALL
                         SELECT categoria, faixa_codigo, faixa_label, exercicio 
-                        FROM historico_lancamentos_analitico
+                        FROM lancamento_iptu.historico_lancamentos_analitico
                     )
                     GROUP BY 1, 2, 3, 4
                 """

@@ -375,7 +375,14 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             "faixas": [dict(r) for r in faixas],
             "iptu_social_historico": iptu_social_serie,
             "arrecadacao_historica": [{"exercicio": h["exercicio"], "valor": float(h["valor_total"]), "imoveis": h["total_imoveis"]} for h in historico_geral],
-            "volume_historico": [{"exercicio": h["exercicio"], "total": h["total_imoveis"]} for h in historico_geral]
+            "volume_historico": [{"exercicio": h["exercicio"], "total": h["total_imoveis"]} for h in historico_geral],
+            "series": {
+                "social": [{"exercicio": h["exercicio"], "valor": int(h["iptu_social"])} for h in historico_geral],
+                "isentos": [{"exercicio": h["exercicio"], "valor": int(h["isentos"])} for h in historico_geral],
+                "imunes": [{"exercicio": h["exercicio"], "valor": int(h["imunes"])} for h in historico_geral],
+                "minimo": [{"exercicio": h["exercicio"], "valor": int(h["imposto_minimo"])} for h in historico_geral],
+                "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in historico_geral]
+            }
         })
     except Exception as e:
         return RespostaPadrao(dados={}, meta={"mensagem": str(e)})
