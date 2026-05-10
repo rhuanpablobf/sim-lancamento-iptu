@@ -342,7 +342,11 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
 
             historico_geral = consultar_clickhouse("""
                 SELECT exercicio, count() AS total_imoveis, 
+                       countIf(tipo_lancamento = 0) AS normal,
+                       countIf(tipo_lancamento = 1) AS isentos,
+                       countIf(tipo_lancamento = 2) AS imposto_minimo,
                        countIf(tipo_lancamento = 3) AS social,
+                       countIf(tipo_lancamento = 4) AS imunes,
                        sum(valr_imposto) AS valor_total
                 FROM lancamento_iptu.historico_lancamentos_analitico
                 GROUP BY exercicio ORDER BY exercicio
