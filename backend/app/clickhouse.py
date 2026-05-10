@@ -55,7 +55,11 @@ def inicializar_clickhouse():
             faixa_label String,
             tipo_lancamento UInt8,
             tipo_edificacao String,
-            valr_imposto Float64
+            valr_imposto Float64,
+            valr_venal_simulado Float64,
+            valr_imposto_anterior Float64,
+            valr_venal_anterior Float64,
+            valr_aliquota Float64
         ) ENGINE = MergeTree()
         ORDER BY (simulacao_id, exercicio, categoria, faixa_codigo)
     """)
@@ -69,7 +73,8 @@ def inicializar_clickhouse():
             faixa_label String,
             tipo_lancamento UInt8,
             tipo_edificacao String,
-            valr_imposto Float64
+            valr_imposto Float64,
+            valr_venal_total Float64
         ) ENGINE = MergeTree()
         ORDER BY (exercicio, categoria, faixa_codigo)
     """)
@@ -128,7 +133,8 @@ def sincronizar_historico_para_clickhouse(db_session):
                  WHEN s."INFO_POSICAO_FISCAL_LAN" = 1 THEN 4 -- Imune
                  ELSE 0 END AS tipo_lancamento,
             COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
-            COALESCE(s."VALR_IMPOSTO_LAN", 0) AS valr_imposto
+            COALESCE(s."VALR_IMPOSTO_LAN", 0) AS valr_imposto,
+            COALESCE(s."VALR_VENAL_LAN", 0) AS valr_venal_total
         FROM "SIA_LANCIPTU_ASG" s
         LEFT JOIN tipos t ON s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG"
     """)
@@ -145,6 +151,7 @@ def sincronizar_historico_para_clickhouse(db_session):
             df['exercicio'] = df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
             df['tipo_lancamento'] = df['tipo_lancamento'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
             df['valr_imposto'] = df['valr_imposto'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+            df['valr_venal_total'] = df['valr_venal_total'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
             df['faixa_codigo'] = df['faixa_codigo'].astype(str).replace('None', '0').replace('nan', '0')
             
             client.insert_df('historico_lancamentos_analitico', df, database='lancamento_iptu')
@@ -200,9 +207,13 @@ def sincronizar_simulacao_para_clickhouse(simulacao_id, db_session):
                  ELSE 'Não Residencial' END AS categoria,
             s.faixa_atual AS faixa_codigo,
             COALESCE(f.faixa_label, 'Faixa ' || s.faixa_atual) AS faixa_label,
-            s.tipo_lancamento,
+            COALESCE(s.tipo_lancamento, 0) AS tipo_lancamento,
             COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
-            COALESCE(s.valr_imposto_final, 0) AS valr_imposto
+            COALESCE(s.valr_imposto_final, 0) AS valr_imposto,
+            COALESCE(s.valr_venal_simulado, 0) AS valr_venal_simulado,
+            COALESCE(s.valr_imposto_anterior, 0) AS valr_imposto_anterior,
+            COALESCE(s.valr_venal_base, 0) AS valr_venal_anterior,
+            COALESCE(s.valr_aliquota_simulada, 0) AS valr_aliquota
         FROM sim_lancamentos s
         JOIN "SIA_LANCIPTU_ASG" b ON s.isn_sia_lanciptu_asg = b."ISN_SIA_LANCIPTU_ASG"
         LEFT JOIN tipos t ON s.isn_sia_lanciptu_asg = t."ISN_SIA_LANCIPTU_ASG"
@@ -229,6 +240,10 @@ def sincronizar_simulacao_para_clickhouse(simulacao_id, db_session):
             df['exercicio'] = df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
             df['tipo_lancamento'] = df['tipo_lancamento'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
             df['valr_imposto'] = df['valr_imposto'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+            df['valr_venal_simulado'] = df['valr_venal_simulado'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+            df['valr_imposto_anterior'] = df['valr_imposto_anterior'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+            df['valr_venal_anterior'] = df['valr_venal_anterior'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+            df['valr_aliquota'] = df['valr_aliquota'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
             df['simulacao_id'] = df['simulacao_id'].astype(str)
             df['faixa_codigo'] = df['faixa_codigo'].astype(str).replace('None', '0').replace('nan', '0')
             
