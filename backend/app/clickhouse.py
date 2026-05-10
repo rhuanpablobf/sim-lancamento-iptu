@@ -139,23 +139,34 @@ def sincronizar_historico_para_clickhouse(db_session):
         LEFT JOIN tipos t ON s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG"
     """)
     
+    logging.info("Sincronizando histórico para ClickHouse em lotes...")
+    
     try:
         # Limpa dados antigos
         client.command("TRUNCATE TABLE lancamento_iptu.historico_lancamentos_analitico")
         
-        resultado = db_session.execute(query)
-        df = pd.DataFrame(resultado.mappings().all())
+        # Executa com streaming para não estourar a RAM
+        # Precisamos de uma conexão direta para stream_results
+        from sqlalchemy import create_engine
+        engine = create_engine(db_session.get_bind().url)
         
-        if not df.empty:
-            # Blindagem final: converter para tipos nativos do Python para o driver
-            df['exercicio'] = df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
-            df['tipo_lancamento'] = df['tipo_lancamento'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
-            df['valr_imposto'] = df['valr_imposto'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['valr_venal_total'] = df['valr_venal_total'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['faixa_codigo'] = df['faixa_codigo'].astype(str).replace('None', '0').replace('nan', '0')
-            
-            client.insert_df('historico_lancamentos_analitico', df, database='lancamento_iptu')
-            logging.info(f"Histórico sincronizado: {len(df)} registros.")
+        with engine.connect().execution_options(stream_results=True) as conn:
+            # Busca em lotes de 100.000
+            for chunk_df in pd.read_sql(query, conn, chunksize=100000):
+                if not chunk_df.empty:
+                    # Blindagem final: converter para tipos nativos
+                    chunk_df['exercicio'] = chunk_df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+                    chunk_df['tipo_lancamento'] = chunk_df['tipo_lancamento'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+                    chunk_df['valr_imposto'] = chunk_df['valr_imposto'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['valr_venal_total'] = chunk_df['valr_venal_total'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['faixa_codigo'] = chunk_df['faixa_codigo'].astype(str).replace('None', '0').replace('nan', '0')
+                    
+                    client.insert_df('historico_lancamentos_analitico', chunk_df, database='lancamento_iptu')
+                    logging.info(f"Lote de histórico enviado: {len(chunk_df)} registros.")
+
+        logging.info("Sincronização de histórico concluída.")
+    except Exception as e:
+        logging.error(f"Erro ao sincronizar histórico: {e}")
     except Exception as e:
         logging.error(f"Erro ao sincronizar histórico: {e}")
 
@@ -232,23 +243,28 @@ def sincronizar_simulacao_para_clickhouse(simulacao_id, db_session):
         except:
             pass
 
-        resultado = db_session.execute(query, {"sid": str(simulacao_id)})
-        df = pd.DataFrame(resultado.mappings().all())
+        from sqlalchemy import create_engine
+        engine = create_engine(db_session.get_bind().url)
         
-        if not df.empty:
-            # Blindagem final: converter para tipos nativos do Python para o driver
-            df['exercicio'] = df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
-            df['tipo_lancamento'] = df['tipo_lancamento'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
-            df['valr_imposto'] = df['valr_imposto'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['valr_venal_simulado'] = df['valr_venal_simulado'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['valr_imposto_anterior'] = df['valr_imposto_anterior'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['valr_venal_anterior'] = df['valr_venal_anterior'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['valr_aliquota'] = df['valr_aliquota'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
-            df['simulacao_id'] = df['simulacao_id'].astype(str)
-            df['faixa_codigo'] = df['faixa_codigo'].astype(str).replace('None', '0').replace('nan', '0')
-            
-            client.insert_df('sim_lancamentos_analitico', df, database='lancamento_iptu')
-            logging.info(f"Simulação {simulacao_id} sincronizada: {len(df)} registros.")
+        with engine.connect().execution_options(stream_results=True) as conn:
+            # Busca em lotes de 100.000
+            for chunk_df in pd.read_sql(query, conn, chunksize=100000, params={"sid": str(simulacao_id)}):
+                if not chunk_df.empty:
+                    # Blindagem final
+                    chunk_df['exercicio'] = chunk_df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+                    chunk_df['tipo_lancamento'] = chunk_df['tipo_lancamento'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+                    chunk_df['valr_imposto'] = chunk_df['valr_imposto'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['valr_venal_simulado'] = chunk_df['valr_venal_simulado'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['valr_imposto_anterior'] = chunk_df['valr_imposto_anterior'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['valr_venal_anterior'] = chunk_df['valr_venal_anterior'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['valr_aliquota'] = chunk_df['valr_aliquota'].apply(lambda x: float(x) if pd.notnull(x) else 0.0)
+                    chunk_df['simulacao_id'] = chunk_df['simulacao_id'].astype(str)
+                    chunk_df['faixa_codigo'] = chunk_df['faixa_codigo'].astype(str).replace('None', '0').replace('nan', '0')
+                    
+                    client.insert_df('sim_lancamentos_analitico', chunk_df, database='lancamento_iptu')
+                    logging.info(f"Lote de simulação {simulacao_id} enviado: {len(chunk_df)} registros.")
+
+        logging.info(f"Simulação {simulacao_id} sincronizada com sucesso.")
     except Exception as e:
         logging.error(f"Erro ao sincronizar simulação {simulacao_id}: {e}")
 
