@@ -314,10 +314,17 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             """), {"ex": str(ex)}).mappings().all()
 
             historico_geral = db.execute(text("""
-                SELECT "CODG_EXERCICIO_LAN" AS exercicio, COUNT(*) AS total_imoveis,
-                       COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3) AS social,
-                       COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valor_total
-                FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
+                SELECT 
+                    "CODG_EXERCICIO_LAN" AS exercicio, 
+                    COUNT(*) AS total_imoveis,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 0) AS normal,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1) AS isentos,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3) AS social,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 4) AS imunes,
+                    COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valor_total
+                FROM "SIA_LANCIPTU_ASG" 
+                WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
                 GROUP BY 1 ORDER BY 1
             """)).mappings().all()
         else:
