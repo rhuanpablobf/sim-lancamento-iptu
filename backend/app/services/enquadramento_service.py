@@ -60,17 +60,17 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
             for cat_nome, faixas in faixas_por_cat.items():
                 # Mapear categoria para filtros SQL do Postgres
                 filtro_uso = ""
-                if cat_nome == "Residencial":
+                if cat_nome == "RESIDENCIAL":
                     filtro_uso = 'AND "INFO_USO_LAN" = 1 AND "TIPO_IMPOSTO_LAN" != 2'
-                elif cat_nome == "Não Residencial":
+                elif cat_nome == "NAO_RESIDENCIAL":
                     filtro_uso = 'AND "INFO_USO_LAN" != 1 AND "TIPO_IMPOSTO_LAN" != 2'
-                elif cat_nome == "Territorial":
+                elif cat_nome == "TERRITORIAL":
                     filtro_uso = 'AND "TIPO_IMPOSTO_LAN" = 2'
 
                 # Resetar faixas antes de começar
                 db.execute(text(f"""
                     UPDATE "SIA_LANCIPTU_ASG" 
-                    SET faixa_codigo = NULL, faixa_label = NULL
+                    SET faixa_codigo = NULL, faixa_label = NULL, faixa_ordem = NULL
                     WHERE "CODG_EXERCICIO_LAN" = :ano {filtro_uso}
                 """), {"ano": ano})
                 db.commit()
@@ -85,12 +85,14 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                     # Batismo automático se estiver nulo
                     f_cod = str(f["faixa_codigo"]) if f["faixa_codigo"] else str(idx)
                     f_lab = str(f["faixa_label"]) if f["faixa_label"] else f"Faixa {idx}"
+                    f_ord = f["faixa_ordem"] if f["faixa_ordem"] is not None else idx
 
                     # Atualizar imóveis que caem nesta faixa
                     sql_update = text(f"""
                         UPDATE "SIA_LANCIPTU_ASG"
                         SET faixa_codigo = :f_cod,
-                            faixa_label = :f_lab
+                            faixa_label = :f_lab,
+                            faixa_ordem = :f_ord
                         WHERE "CODG_EXERCICIO_LAN" = :ano
                           {filtro_uso}
                           AND CAST(REPLACE(CAST("VALR_VENAL_LAN" AS TEXT), ',', '.') AS NUMERIC) >= :inf
@@ -101,6 +103,7 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                         "ano": ano,
                         "f_cod": f_cod,
                         "f_lab": f_lab,
+                        "f_ord": f_ord,
                         "inf": lim_inf,
                         "sup": lim_sup
                     })
