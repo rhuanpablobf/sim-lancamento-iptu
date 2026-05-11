@@ -76,11 +76,16 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                 """), {"ano": ano})
                 db.commit()
 
-                for f in faixas:
+                # Ordenar faixas pelo limite inferior para garantir numeração correta
+                faixas = sorted(faixas, key=lambda x: float(x["limite_inferior"]))
+                
+                for idx, f in enumerate(faixas, 1):
                     lim_inf = float(f["limite_inferior"])
                     lim_sup = float(f["limite_superior"]) if f["limite_superior"] else 999999999999.0
-                    f_cod = f["faixa_codigo"]
-                    f_lab = f["faixa_label"]
+                    
+                    # Batismo automático se estiver nulo
+                    f_cod = str(f["faixa_codigo"]) if f["faixa_codigo"] else str(idx)
+                    f_lab = str(f["faixa_label"]) if f["faixa_label"] else f"Faixa {idx}"
 
                     # Atualizar imóveis que caem nesta faixa
                     sql_update = text(f"""
@@ -102,7 +107,7 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                     })
                     db.commit()
                     if res.rowcount > 0:
-                        print(f"   ✅ {cat_nome} | Faixa {f_cod}: {res.rowcount} imóveis enquadrados.")
+                        print(f"   ✅ {cat_nome} | {f_lab}: {res.rowcount} imóveis enquadrados.")
             
         print("🚀 Classificação de faixas concluída com sucesso.")
         return True
