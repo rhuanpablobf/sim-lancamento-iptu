@@ -1,0 +1,204 @@
+# CHANGELOG — SimLan IPTU
+
+Todas as alterações significativas deste projeto são documentadas neste arquivo.  
+Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
+
+---
+
+## [Não lançado] — Em desenvolvimento
+
+---
+
+## [2.5.0] — 2026-05-11
+
+### 🐛 Corrigido — Motor de Enquadramento de Faixas (Refatoração Crítica)
+
+#### Problema raiz identificado
+O campo `faixa_codigo`, `faixa_label` e `faixa_ordem` ficavam `NULL` após importação, impedindo a visualização correta do gráfico **"Distribuição de Imóveis por Faixa de Alíquota"** no Dashboard Analítico.
+
+#### Causa 1 — Comparação de categoria com casing errado
+- **Arquivo:** `backend/app/services/enquadramento_service.py`
+- **Bug:** O código comparava `cat_nome == "Residencial"` mas o banco armazenava `"RESIDENCIAL"`.  
+  O `filtro_uso` ficava sempre vazio `""`, fazendo o `UPDATE` rodar sem filtro de categoria — a última categoria processada (Territorial) sobrescrevia **todos** os imóveis.
+- **Correção:** Comparações ajustadas para `"RESIDENCIAL"`, `"NAO_RESIDENCIAL"`, `"TERRITORIAL"`.
+- **Commit:** `b415494`
+
+#### Causa 2 — Leitura de coluna inexistente na query
+- **Bug:** O código tentava acessar `f["faixa_ordem"]` mas a query `SELECT` não incluía essa coluna.
+- **Correção:** Adicionado `faixa_ordem` ao `SELECT` e adicionado guard `else: continue` para categorias desconhecidas.
+- **Commit:** `ba35cc9`
+
+#### Causa 3 — Lógica de classificação completamente errada (ranges vs alíquota)
+- **Bug:** A classificação usava faixas de valor venal (`limite_inferior` / `limite_superior`) para enquadrar imóveis históricos. O problema: os dados históricos já possuem a alíquota aplicada (`VALR_ALIQUOTA_LAN`), que identifica unicamente a faixa.
+- **Correção:** Reescrita completa do motor de classificação usando `JOIN` direto:
+  ```sql
+  VALR_ALIQUOTA_LAN = fr.aliquota
+  ```
+  Categoria determinada por `TIPO_IMPOSTO_LAN` + `INFO_USO_LAN`:
+  - `TIPO_IMPOSTO_LAN = 2` → `TERRITORIAL`
+  - `TIPO_IMPOSTO_LAN = 1` + `INFO_USO_LAN = 1` → `RESIDENCIAL`
+  - `TIPO_IMPOSTO_LAN = 1` + `INFO_USO_LAN > 1` → `NAO_RESIDENCIAL`
+- **Commits:** `2ac82b9`, `76be4d1`
+
+#### Causa 4 — Tabela fonte errada para histórico
+- **Bug:** O código usava `sim_faixas_aliquota` como fonte principal. Essa tabela é usada apenas como base para projeção de anos futuros (2027+).
+- **Correção:** A fonte de verdade para dados históricos reais é **exclusivamente `sim_faixas_referencia`**, que contém as alíquotas oficiais do Código Tributário Municipal.
+- **Commit:** `76be4d1`
+
+### ✅ Comportamento final correto
+```
+Imóvel 2022 com VALR_ALIQUOTA_LAN = 0.00400
+  → TIPO_IMPOSTO_LAN = 1, INFO_USO_LAN = 1 → categoria: RESIDENCIAL
+  → 0.00400 = RES-F4 em sim_faixas_referencia
+  → faixa_codigo = "RES-F4", faixa_label = "Faixa 4 — R$ 300k a R$ 500k", faixa_ordem = 4
+```
+
+### ➕ Adicionado
+- Diagnóstico automático pós-classificação: exibe alíquotas sem correspondência em `sim_faixas_referencia` com quantidade de imóveis afetados.
+- Guard `else: continue` para categorias desconhecidas no loop de processamento.
+
+---
+
+## [2.4.0] — 2026-05-09 a 2026-05-10
+
+### 🐛 Corrigido — Sincronização ClickHouse e Nomes de Tabelas
+
+- **Problema:** Erro `UNKNOWN_TABLE` ao sincronizar o histórico com o ClickHouse após renomeação de tabelas.
+- **Correção:** Nomes das tabelas atualizados para `historico_lancamentos_analitico` e `sim_lancamentos_analitico`.
+- **Arquivo:** `backend/app/clickhouse.py`
+
+### 🐛 Corrigido — Categorização no ClickHouse
+- **Problema:** A query de sincronização do histórico usava o status fiscal ao invés do tipo de uso do imóvel.
+- **Correção:** Padronização das categorias para `Residencial`, `Não Residencial`, `Territorial` — consistente com os dados de simulação.
+- **Arquivo:** `backend/app/clickhouse.py` (linhas 123–136)
+
+### ➕ Adicionado — Classificação Automática no Fluxo de Importação
+- A tarefa `importar_csv_task` agora chama automaticamente `classificar_faixas_base_real()` e `sincronizar_historico_para_clickhouse()` após cada importação bem-sucedida.
+- **Arquivo:** `backend/app/tasks/importacao_task.py` (linhas 161–185)
+- **Commit:** `bc1e2fb`, `e2c1690`
+
+### ➕ Adicionado — Motor de Classificação de Faixas (versão inicial)
+- Criação do serviço `enquadramento_service.py` com a função `classificar_faixas_base_real()`.
+- Primeira implementação (substituída na v2.5.0 pela lógica correta por alíquota).
+
+---
+
+## [2.3.0] — 2026-05-08
+
+### ➕ Adicionado — Dashboard Analítico com ClickHouse
+
+- Motor de performance migrado para ClickHouse para suportar consultas analíticas em milhões de registros.
+- KPIs em tempo real: total de imóveis, valor venal total, imposto total, ticket médio.
+- Gráficos de evolução histórica por categoria (Residencial, Não Residencial, Territorial).
+- **Distribuição por Faixa de Alíquota** — gráfico de barras que exibe quantidade de imóveis por faixa.
+- **Commits:** `fe30f8c`, `77a2b28`, `ac1ab1a`
+
+### ⚡ Performance
+- Sincronização em lotes para evitar estouro de RAM em bases com milhões de registros.
+- **Commit:** `77a2b28`
+
+### 🐛 Corrigido
+- Métricas zeradas no dashboard corrigidas (`f696eaf`).
+- `KeyError` no dashboard tratado com fallback seguro (`cee850f`).
+- Serialização e sintaxe em queries UNION do dashboard de simulação (`7a106be`, `00dc4ba`).
+
+---
+
+## [2.2.0] — 2026-05-07 a 2026-05-08
+
+### ➕ Adicionado — Modo VPS (Importação por Volume)
+
+- Implementado endpoint e UI para carga direta de arquivos via volume Docker `/opt/dados_iptu`.
+- Permite importar arquivos de grande volume (centenas de MB) sem upload HTTP.
+- **Commit:** `47d96f4`
+
+### ➕ Adicionado — Progresso Granular na Importação
+- Barra de progresso com etapas detalhadas: Postgres → Classificação → ClickHouse.
+- **Commits:** `155bef7`, `4077d03`
+
+### 🐛 Corrigido — Importação CSV
+- Remoção de duplicatas no CSV auxiliar para evitar `UniqueViolation` (`baa4a80`).
+- Suporte a múltiplos tipos de edificação com chave composta (`fe0ce2e`).
+- Preservação de arquivos na VPS após importação — não remove arquivos fora da pasta `uploads` (`15d7fef`).
+
+---
+
+## [2.1.0] — 2026-05-04 a 2026-05-07
+
+### ➕ Adicionado — Motor de Simulação
+
+- Motor de cálculo de imposto com suporte a cenários IPCA e SELIC.
+- Criação de simulações com parâmetros configuráveis por categoria.
+- Dashboard de simulação com variação percentual em relação à base real.
+- **Commits:** `c21ea0e`, `26c3d39`, `3ed4a27`
+
+### ➕ Adicionado — Faixas de Alíquota (CRUD)
+- Interface para cadastro e edição de faixas de alíquota por categoria e exercício.
+- Projeção automática de faixas para anos futuros com base em índices (IPCA/SELIC).
+- Seleção dinâmica de "Ano-base das faixas" listando apenas anos com dados cadastrados.
+
+### 🐛 Corrigido
+- Erro 404 na busca de imóvel na auditoria com campos numeric (`02c4f73`).
+- Lógica de categorização de lançamentos baseada em `TIPO_IMPOSTO_LAN` e `INFO_USO_LAN` (`02c4f73`).
+
+---
+
+## [2.0.0] — 2026-05-03 a 2026-05-04
+
+### ➕ Adicionado — Infraestrutura de Produção
+
+- `docker-compose.prod.yml` configurado para deploy com Traefik + Docker Swarm.
+- CI/CD com GitHub Actions: build, push para GHCR e deploy automático por SSH.
+- Banco de dados externo PostgreSQL 15 separado do stack da aplicação.
+- Volumes persistentes em `/opt/dados_iptu` na VPS.
+- **Commits:** `3a43ef9`, `20b2aff`, `26617a9`
+
+### ➕ Adicionado — Schema do Banco de Dados
+
+- Tabela `SIA_LANCIPTU_ASG`: base de dados histórica dos lançamentos IPTU.
+  - Colunas de classificação adicionadas: `faixa_codigo`, `faixa_label`, `faixa_ordem`.
+- Tabela `SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN`: dados auxiliares de edificação.
+- Tabela `sim_faixas_referencia`: alíquotas oficiais do Código Tributário Municipal.
+- Tabela `sim_faixas_aliquota`: base para projeção de faixas de anos futuros.
+- Tabelas ClickHouse: `historico_lancamentos_analitico`, `sim_lancamentos_analitico`.
+
+### ➕ Adicionado — Frontend
+- Dashboard Analítico com gráficos interativos (Recharts).
+- Página de Importação com suporte a Upload e Modo VPS.
+- Página de Faixas de Alíquota com editor inline.
+- Página de Estudos de Impacto e Auditoria do Imóvel.
+
+---
+
+## Tabela de Responsabilidades por Tabela
+
+| Tabela | Responsabilidade |
+|---|---|
+| `SIA_LANCIPTU_ASG` | Dados históricos reais dos lançamentos IPTU |
+| `sim_faixas_referencia` | Alíquotas oficiais do CTM — fonte para classificação histórica |
+| `sim_faixas_aliquota` | Base para projeção de faixas de anos futuros (2027+) |
+| `sim_simulacoes` | Cabeçalho das simulações criadas pelo usuário |
+| `sim_lancamentos` | Resultados calculados de cada simulação |
+| `historico_lancamentos_analitico` | Dados históricos sincronizados no ClickHouse |
+| `sim_lancamentos_analitico` | Dados de simulação sincronizados no ClickHouse |
+
+---
+
+## Lógica de Classificação de Faixas (Referência)
+
+```
+Para cada imóvel em SIA_LANCIPTU_ASG:
+
+  1. Determinar categoria:
+     TIPO_IMPOSTO_LAN = 2              → TERRITORIAL
+     TIPO_IMPOSTO_LAN = 1, USO = 1    → RESIDENCIAL
+     TIPO_IMPOSTO_LAN = 1, USO > 1    → NAO_RESIDENCIAL
+
+  2. Cruzar com sim_faixas_referencia:
+     WHERE VALR_ALIQUOTA_LAN = fr.aliquota AND categoria = <categoria acima>
+
+  3. Resultado: faixa_codigo, faixa_label, faixa_ordem preenchidos.
+```
+
+> **Nota:** A alíquota 1% (0.01000) existe em TERRITORIAL e NAO_RESIDENCIAL,  
+> mas o filtro por `TIPO_IMPOSTO_LAN` garante o cruzamento correto sem ambiguidade.
