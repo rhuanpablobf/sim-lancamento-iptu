@@ -212,15 +212,26 @@ def imovel_simulacao(
     db: Session = Depends(obter_sessao),
 ) -> RespostaPadrao:
     """Retorna o histórico simulado de um imóvel por exercício."""
-    itens = (
-        db.query(SimLancamento)
-        .filter(
-            SimLancamento.simulacao_id == simulacao_id,
-            SimLancamento.codg_inscricao_lan == inscricao,
+    # Correção robusta para campos NUMERIC no banco de dados
+    try:
+        # Tenta converter para int para remover zeros à esquerda se o banco for numeric
+        import re
+        inscricao_limpa = re.sub(r'\D', '', inscricao)
+        
+        # Faz a query usando o campo convertido para garantir compatibilidade
+        from sqlalchemy import cast, String
+        itens = (
+            db.query(SimLancamento)
+            .filter(
+                SimLancamento.simulacao_id == simulacao_id,
+                cast(SimLancamento.codg_inscricao_lan, String) == inscricao_limpa,
+            )
+            .order_by(SimLancamento.codg_exercicio_lan)
+            .all()
         )
-        .order_by(SimLancamento.codg_exercicio_lan)
-        .all()
-    )
+    except Exception as e:
+        logging.error(f"Erro na busca de inscrição {inscricao}: {e}")
+        itens = []
     if not itens:
         raise HTTPException(status_code=404, detail="Imóvel não encontrado nesta simulação.")
 
