@@ -8,21 +8,27 @@ logger = logging.getLogger(__name__)
 
 def classificar_faixas_base_real(db: Session, anos: list = None):
     """
-    Classifica cada imóvel da base real (SIA_LANCIPTU_ASG) em sua respectiva faixa de alíquota.
+    Classifica cada imóvel da base real (SIA_LANCIPTU_ASG) em sua faixa de alíquota.
 
-    Lógica de classificação por alíquota aplicada (VALR_ALIQUOTA_LAN):
+    Fonte de verdade: sim_faixas_referencia
     ─────────────────────────────────────────────────────────────────────
-    1. Determina a categoria do imóvel:
-       - TIPO_IMPOSTO_LAN = 2                          → TERRITORIAL
-       - TIPO_IMPOSTO_LAN = 1 e INFO_USO_LAN = 1       → RESIDENCIAL
-       - TIPO_IMPOSTO_LAN = 1 e INFO_USO_LAN > 1       → NAO_RESIDENCIAL
+    Contém as alíquotas oficiais do Código Tributário Municipal e é usada
+    para classificar TODOS os dados históricos reais (2022-2026+).
 
-    2. Cruza VALR_ALIQUOTA_LAN com o campo aliquota da tabela de faixas:
-       - Prioridade 1: sim_faixas_aliquota (exercício exato) — faixas cadastradas no sistema
-       - Prioridade 2: sim_faixas_referencia — faixas históricas de referência
+    sim_faixas_aliquota é usada apenas como base para projeção de anos
+    futuros (2027+) e NÃO entra na classificação do histórico real.
 
-    Exceção: alíquota de 1% (0.01000) existe em TERRITORIAL e NAO_RESIDENCIAL,
-    mas é resolvida pelo TIPO_IMPOSTO_LAN antes do cruzamento.
+    Lógica:
+    1. Categoria do imóvel via TIPO_IMPOSTO_LAN + INFO_USO_LAN:
+       - TIPO_IMPOSTO_LAN = 2                       → TERRITORIAL
+       - TIPO_IMPOSTO_LAN = 1 + INFO_USO_LAN = 1    → RESIDENCIAL
+       - TIPO_IMPOSTO_LAN = 1 + INFO_USO_LAN > 1    → NAO_RESIDENCIAL
+
+    2. Cruzar VALR_ALIQUOTA_LAN com o campo aliquota de sim_faixas_referencia
+       para encontrar faixa_codigo, faixa_label e faixa_ordem.
+
+    Observação: alíquota 1% (0.01000) existe em TERRITORIAL e NAO_RESIDENCIAL,
+    mas é resolvida corretamente pelo TIPO_IMPOSTO_LAN antes do cruzamento.
     """
     try:
         if not anos:
@@ -48,47 +54,17 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
             db.commit()
 
             # ─────────────────────────────────────────────────────────────────
-            # Passo 1: Classificar usando sim_faixas_aliquota (exercício exato)
-            # Faixas cadastradas pelo usuário no sistema para o ano específico
+            # Classificar via JOIN: VALR_ALIQUOTA_LAN = aliquota
+            # Fonte: sim_faixas_referencia (alíquotas oficiais do CTM)
+            # Categoria determinada por TIPO_IMPOSTO_LAN + INFO_USO_LAN
             # ─────────────────────────────────────────────────────────────────
-            res1 = db.execute(text("""
-                UPDATE "SIA_LANCIPTU_ASG" s
-                SET faixa_codigo = fa.faixa_codigo,
-                    faixa_label  = fa.faixa_label,
-                    faixa_ordem  = fa.faixa_ordem
-                FROM sim_faixas_aliquota fa
-                WHERE s."CODG_EXERCICIO_LAN" = :ano
-                  AND fa.exercicio = :ano
-                  AND fa.simulacao_id IS NULL
-                  AND s."VALR_ALIQUOTA_LAN" = fa.aliquota
-                  AND (
-                      -- Territorial: TIPO_IMPOSTO_LAN = 2
-                      (s."TIPO_IMPOSTO_LAN" = 2 AND fa.categoria = 'TERRITORIAL')
-                      OR
-                      -- Residencial: predial (tipo=1) com uso residencial (uso=1)
-                      (s."TIPO_IMPOSTO_LAN" = 1 AND s."INFO_USO_LAN" = 1 AND fa.categoria = 'RESIDENCIAL')
-                      OR
-                      -- Não Residencial: predial (tipo=1) com uso não residencial (uso>1)
-                      (s."TIPO_IMPOSTO_LAN" = 1 AND s."INFO_USO_LAN" != 1 AND fa.categoria = 'NAO_RESIDENCIAL')
-                  )
-            """), {"ano": ano})
-            db.commit()
-            classificados_passo1 = res1.rowcount
-            print(f"   📊 Passo 1 (sim_faixas_aliquota exercício {ano}): {classificados_passo1} imóveis classificados.")
-
-            # ─────────────────────────────────────────────────────────────────
-            # Passo 2: Classificar restantes usando sim_faixas_referencia
-            # Para imóveis que não foram classificados no passo 1
-            # (anos sem faixas específicas cadastradas no sistema)
-            # ─────────────────────────────────────────────────────────────────
-            res2 = db.execute(text("""
+            res = db.execute(text("""
                 UPDATE "SIA_LANCIPTU_ASG" s
                 SET faixa_codigo = fr.faixa_codigo,
                     faixa_label  = fr.faixa_label,
                     faixa_ordem  = fr.faixa_ordem
                 FROM sim_faixas_referencia fr
                 WHERE s."CODG_EXERCICIO_LAN" = :ano
-                  AND s.faixa_codigo IS NULL
                   AND s."VALR_ALIQUOTA_LAN" = fr.aliquota
                   AND (
                       -- Territorial: TIPO_IMPOSTO_LAN = 2
@@ -102,34 +78,31 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                   )
             """), {"ano": ano})
             db.commit()
-            classificados_passo2 = res2.rowcount
-            print(f"   📊 Passo 2 (sim_faixas_referencia fallback): {classificados_passo2} imóveis classificados.")
 
-            # ─────────────────────────────────────────────────────────────────
-            # Diagnóstico: imóveis que ficaram sem classificação
-            # ─────────────────────────────────────────────────────────────────
+            classificados = res.rowcount
+
+            # Diagnóstico: imóveis sem classificação
             nao_classificados = db.execute(text("""
                 SELECT COUNT(*) FROM "SIA_LANCIPTU_ASG"
                 WHERE "CODG_EXERCICIO_LAN" = :ano AND faixa_codigo IS NULL
             """), {"ano": ano}).scalar()
 
-            total_classificados = classificados_passo1 + classificados_passo2
-            print(f"   ✅ Ano {ano}: {total_classificados} classificados | ⚠️ {nao_classificados} sem faixa.")
+            print(f"   ✅ Ano {ano}: {classificados} classificados | ⚠️ {nao_classificados} sem faixa.")
 
             if nao_classificados > 0:
-                # Mostrar alíquotas que não encontraram correspondência (para diagnóstico)
-                aliquotas_sem_match = db.execute(text("""
-                    SELECT DISTINCT "VALR_ALIQUOTA_LAN", "TIPO_IMPOSTO_LAN", "INFO_USO_LAN", COUNT(*) as total
+                # Mostra as alíquotas sem correspondência em sim_faixas_referencia
+                sem_match = db.execute(text("""
+                    SELECT "VALR_ALIQUOTA_LAN", "TIPO_IMPOSTO_LAN", "INFO_USO_LAN", COUNT(*) as total
                     FROM "SIA_LANCIPTU_ASG"
                     WHERE "CODG_EXERCICIO_LAN" = :ano AND faixa_codigo IS NULL
                     GROUP BY "VALR_ALIQUOTA_LAN", "TIPO_IMPOSTO_LAN", "INFO_USO_LAN"
                     ORDER BY total DESC
                     LIMIT 10
                 """), {"ano": ano}).fetchall()
-                for row in aliquotas_sem_match:
+                for row in sem_match:
                     logger.warning(
-                        f"   ⚠️ Alíquota sem faixa: {row[0]} | "
-                        f"tipo={row[1]} | uso={row[2]} | {row[3]} imóveis"
+                        f"   ⚠️  Sem faixa em sim_faixas_referencia: "
+                        f"aliquota={row[0]} | tipo={row[1]} | uso={row[2]} | {row[3]} imóveis"
                     )
 
         print("🚀 Classificação de faixas concluída com sucesso.")
