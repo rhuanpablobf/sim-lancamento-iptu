@@ -158,7 +158,20 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
             os.remove(path_auxiliar)
             logger.info(f"Arquivo temporário removido: {path_auxiliar}")
         
-        # 5. Sincronizar automaticamente com ClickHouse
+        # 5. Classificar faixas na base real (novo)
+        try:
+            from app.services.enquadramento_service import classificar_faixas_base_real
+            from app.db import SessionLocal
+            db_enf = SessionLocal()
+            try:
+                self.update_state(state='PROGRESS', meta={'progresso': 97, 'mensagem': '[POSTGRES] Classificando faixas de alíquota...'})
+                classificar_faixas_base_real(db_enf, anos=anos)
+            finally:
+                db_enf.close()
+        except Exception as e_enf:
+            logger.error(f"Erro na classificação de faixas: {e_enf}")
+
+        # 6. Sincronizar automaticamente com ClickHouse
         try:
             from app.clickhouse import sincronizar_historico_para_clickhouse
             from app.db import SessionLocal

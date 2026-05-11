@@ -123,15 +123,12 @@ def sincronizar_historico_para_clickhouse(db_session):
         )
         SELECT 
             COALESCE(s."CODG_EXERCICIO_LAN", 0) AS exercicio,
-            CASE 
-                WHEN s."TIPO_LANCAMENTO_LAN" = 1 AND s."INFO_POSICAO_FISCAL_LAN" IS NULL THEN 'Social'
-                WHEN s."TIPO_LANCAMENTO_LAN" = 1 AND s."INFO_POSICAO_FISCAL_LAN" = 1 THEN 'Imune'
-                WHEN s."TIPO_LANCAMENTO_LAN" = 1 AND s."INFO_POSICAO_FISCAL_LAN" >= 2 THEN 'Isento'
-                WHEN s."TIPO_LANCAMENTO_LAN" = 2 THEN 'Imposto Mínimo'
-                WHEN s."TIPO_LANCAMENTO_LAN" = 3 THEN 'Social'
-                WHEN s."TIPO_LANCAMENTO_LAN" = 0 OR s."TIPO_LANCAMENTO_LAN" IS NULL THEN 'Normal'
-                ELSE 'Normal'
-            END AS categoria,
+            CASE WHEN s."TIPO_LANCAMENTO_LAN" = 2 THEN 'Imposto Mínimo'
+                 WHEN s."INFO_POSICAO_FISCAL_LAN" = 1 THEN 'Imune'
+                 WHEN s."INFO_POSICAO_FISCAL_LAN" >= 2 THEN 'Isento'
+                 WHEN s."TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
+                 WHEN s."INFO_USO_LAN" = '1' THEN 'Residencial'
+                 ELSE 'Não Residencial' END AS categoria,
             COALESCE(s.faixa_codigo, '0') AS faixa_codigo,
             COALESCE(s.faixa_label, 'Sem Faixa') AS faixa_label,
             CASE 
