@@ -113,7 +113,7 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
                 
                 self.update_state(state='PROGRESS', meta={
                     'progresso': min(prog, 70), 
-                    'mensagem': f'Arquivo Principal: {total_processado:,} de {total_linhas_prin:,} registros...'.replace(',', '.')
+                    'mensagem': f'[POSTGRES] Lançamentos: {total_processado:,} registros...'.replace(',', '.')
                 })
 
         # 3. Processar e Inserir o arquivo Auxiliar (se existir)
@@ -134,13 +134,13 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
                     
                     self.update_state(state='PROGRESS', meta={
                         'progresso': min(prog, 95), 
-                        'mensagem': f'Arquivo Auxiliar: {total_aux:,} de {total_linhas_aux:,} registros...'.replace(',', '.')
+                        'mensagem': f'[POSTGRES] Auxiliares: {total_aux:,} registros...'.replace(',', '.')
                     })
         else:
             self.update_state(state='PROGRESS', meta={'progresso': 90, 'mensagem': 'Arquivo auxiliar não fornecido, pulando...'})
 
-        # 4. Limpeza final de órfãos
-        self.update_state(state='PROGRESS', meta={'progresso': 96, 'mensagem': 'Finalizando integridade da base...'})
+        # 4. Finalização e Integridade
+        self.update_state(state='PROGRESS', meta={'progresso': 96, 'mensagem': '[POSTGRES] Finalizando integridade da base...'})
         with engine.begin() as conn:
             conn.execute(text("""
                 DELETE FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" t
@@ -164,7 +164,7 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
             from app.db import SessionLocal
             db = SessionLocal()
             try:
-                self.update_state(state='PROGRESS', meta={'progresso': 98, 'mensagem': 'Sincronizando Dashboard de Performance...'})
+                self.update_state(state='PROGRESS', meta={'progresso': 98, 'mensagem': '[CLICKHOUSE] Sincronizando Dashboard de Performance...'})
                 sincronizar_historico_para_clickhouse(db)
             finally:
                 db.close()

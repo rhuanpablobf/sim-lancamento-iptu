@@ -330,11 +330,17 @@ export default function ImportacaoPage() {
               <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
                 <div className="card-body">
                   <div className="flex-between mb-8">
-                    <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--blue-txt)" }}>{fase === 'upload' ? 'UPLOADING' : 'PROCESSING'}</span>
-                    <span style={{ fontSize: "10px", fontWeight: 600 }}>{progresso}%</span>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--blue-txt)", letterSpacing: "0.5px" }}>
+                      {mensagemStatus.includes("[CLICKHOUSE]") ? "SYNCING DASHBOARD" : "PROCESSING DATA"}
+                    </span>
+                    <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--blue-txt)" }}>{progresso}%</span>
                   </div>
-                  <div className="progress-bar"><div className="progress-fill" style={{ width: `${progresso}%` }}></div></div>
-                  <div className="text-xs mt-8 text-muted">{mensagemStatus}</div>
+                  <div className="progress-bar" style={{ height: "6px", background: "rgba(0,0,0,0.05)" }}>
+                    <div className="progress-fill" style={{ width: `${progresso}%`, transition: "width 0.5s ease" }}></div>
+                  </div>
+                  <div className="text-xs mt-12 fw-500" style={{ color: "var(--blue-txt)", opacity: 0.8 }}>
+                    {mensagemStatus || "Iniciando processamento..."}
+                  </div>
                 </div>
               </div>
             )}
