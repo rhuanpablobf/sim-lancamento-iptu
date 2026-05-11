@@ -24,24 +24,37 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
         for ano in anos:
             logger.info(f"Classificando faixas para o exercício {ano}...")
             
-            # 1. Carregar faixas de referência para este ano (ou do ano mais próximo se não houver)
-            # 1. Buscar faixas na tabela de REFERÊNCIA (sim_faixas_referencia)
-            # Esta tabela contém as faixas oficiais do Código Tributário para o histórico
+            # 1. Buscar faixas na tabela principal (sim_faixas_aliquota) para o ano específico
+            # Esta tabela contém as faixas cadastradas pelo usuário no sistema (fonte da verdade)
             faixas_db = db.execute(text("""
-                SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior
-                FROM sim_faixas_referencia 
+                SELECT categoria, faixa_codigo, faixa_label, faixa_ordem, limite_inferior, limite_superior
+                FROM sim_faixas_aliquota 
+                WHERE simulacao_id IS NULL AND exercicio = :ano
                 ORDER BY categoria, limite_inferior
-            """)).mappings().all()
+            """), {"ano": ano}).mappings().all()
 
             if not faixas_db:
-                # Fallback: se a tabela de referência não existir/vazia, tenta as alíquotas base da simulação
-                logger.info(f"Sem faixas em sim_faixas_referencia para {ano}, tentando sim_faixas_aliquota...")
+                # Fallback 1: tentar o exercício mais recente disponível em sim_faixas_aliquota
+                logger.info(f"Sem faixas em sim_faixas_aliquota para {ano}, buscando ano mais recente...")
                 faixas_db = db.execute(text("""
-                    SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior
+                    SELECT categoria, faixa_codigo, faixa_label, faixa_ordem, limite_inferior, limite_superior
                     FROM sim_faixas_aliquota 
-                    WHERE (exercicio = :ano OR exercicio IS NULL) AND simulacao_id IS NULL
+                    WHERE simulacao_id IS NULL AND exercicio = (
+                        SELECT MAX(exercicio) FROM sim_faixas_aliquota WHERE simulacao_id IS NULL
+                    )
                     ORDER BY categoria, limite_inferior
-                """), {"ano": ano}).mappings().all()
+                """)).mappings().all()
+                if faixas_db:
+                    logger.info(f"Usando faixas do exercício mais recente disponível.")
+
+            if not faixas_db:
+                # Fallback 2: sim_faixas_referencia como última opção
+                logger.info(f"Sem faixas em sim_faixas_aliquota, usando sim_faixas_referencia como fallback...")
+                faixas_db = db.execute(text("""
+                    SELECT categoria, faixa_codigo, faixa_label, faixa_ordem, limite_inferior, limite_superior
+                    FROM sim_faixas_referencia 
+                    ORDER BY categoria, limite_inferior
+                """)).mappings().all()
             
             if not faixas_db:
                 print(f"❌ Nenhuma faixa de alíquota encontrada para o ano {ano} ou fallback.")
@@ -86,10 +99,10 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                     lim_sup = float(f["limite_superior"]) if f["limite_superior"] else 999999999999.0
                     
                     # Batismo automático se estiver nulo
-                    # faixa_ordem usa sempre o índice (idx) - não depende da coluna na tabela de referência
+                    # faixa_ordem: usa valor da tabela se existir, caso contrário usa o índice
                     f_cod = str(f["faixa_codigo"]) if f["faixa_codigo"] else str(idx)
                     f_lab = str(f["faixa_label"]) if f["faixa_label"] else f"Faixa {idx}"
-                    f_ord = idx  # Sempre usa o índice de ordenação para garantir consistência
+                    f_ord = int(f["faixa_ordem"]) if f.get("faixa_ordem") is not None else idx
 
                     # Atualizar imóveis que caem nesta faixa
                     sql_update = text(f"""
