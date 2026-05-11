@@ -158,6 +158,19 @@ def importar_csv_task(self, path_principal: str, path_auxiliar: str, modo: str, 
             os.remove(path_auxiliar)
             logger.info(f"Arquivo temporário removido: {path_auxiliar}")
         
+        # 5. Sincronizar automaticamente com ClickHouse
+        try:
+            from app.clickhouse import sincronizar_historico_para_clickhouse
+            from app.db import SessionLocal
+            db = SessionLocal()
+            try:
+                self.update_state(state='PROGRESS', meta={'progresso': 98, 'mensagem': 'Sincronizando Dashboard de Performance...'})
+                sincronizar_historico_para_clickhouse(db)
+            finally:
+                db.close()
+        except Exception as e_ch:
+            logger.error(f"Erro na sincronização automática ClickHouse: {e_ch}")
+
         return {
             "status": "CONCLUIDO",
             "registros_lancamento": total_processado,
