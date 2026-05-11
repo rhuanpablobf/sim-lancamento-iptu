@@ -9,6 +9,56 @@ Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/).
 
 ---
 
+## [2.5.1] — 2026-05-11
+
+### 🐛 Corrigido — Faixas Territoriais Históricas (2022 vs Lei Atual)
+
+#### Descoberta
+Após a correção da lógica de enquadramento (v2.5.0), o diagnóstico revelou que
+**~120.000 imóveis territoriais de 2022** permaneciam sem classificação.
+
+#### Causa
+O Código Tributário Municipal passou por revisão entre 2022 e 2023.  
+As alíquotas territoriais foram **reduzidas em 1% por faixa** na nova redação:
+
+| Faixa | Valor Venal | Alíquota 2022 (lei anterior) | Alíquota 2023+ (lei atual) |
+|---|---|---|---|
+| Faixa 1 | Até R$ 40.000 | **2,00%** | 1,00% |
+| Faixa 2 | R$ 40k a R$ 60k | **2,30%** | 1,30% |
+| Faixa 3 | R$ 60k a R$ 80k | **2,60%** | 1,60% |
+| Faixa 4 | R$ 80k a R$ 100k | **2,90%** | 1,90% |
+| Faixa 5 | R$ 100k a R$ 150k | **3,20%** | 2,20% |
+| Faixa 6 | R$ 150k a R$ 300k | **3,50%** | 2,50% |
+| Faixa 7 | Acima de R$ 300k | **3,80%** | 2,80% |
+
+#### Correção
+Inseridas 7 novas faixas (`TER-H1` a `TER-H7`) em `sim_faixas_referencia` com
+as alíquotas da lei anterior, usando os mesmos limites de valor venal da lei atual.
+
+Script de correção: `docs/sql/corrigir_faixas_territoriais.sql`
+
+#### Casos Residuais (2023-2026, impacto baixo)
+Identificados ~2.800 imóveis por ano sem classificação por causas diversas:
+
+| Alíquota | Tipo | Situação | Ação |
+|---|---|---|---|
+| `0.00990` | 2 (Territorial) | Arredondamento de 1% | Inserida faixa `TER-F1B` |
+| `NULL` | 1 ou 2 | Sem alíquota no dado fonte | Não classificável |
+| `0.02800` / `0.02500` | 1 (Predial) | Taxa territorial em imóvel predial | Erro no dado fonte |
+| `0.00500` | 2 (Territorial) | 0,5% não previsto no CTM | Verificar dado fonte |
+| `0.01400` | 2 (Territorial) | 1,4% não previsto no CTM | Verificar dado fonte |
+
+### ➕ Adicionado — Diagnóstico no Motor de Enquadramento
+- Após a classificação de cada ano, o sistema exibe as alíquotas sem correspondência
+  em `sim_faixas_referencia`, com quantidade de imóveis afetados.
+- Facilita a identificação de faixas faltantes ou erros no dado fonte.
+
+### ➕ Adicionado — Documentação SQL
+- Criada pasta `docs/sql/` para scripts de manutenção do banco de dados.
+- Arquivo `docs/sql/corrigir_faixas_territoriais.sql` com os INSERTs documentados e comentados.
+
+---
+
 ## [2.5.0] — 2026-05-11
 
 ### 🐛 Corrigido — Motor de Enquadramento de Faixas (Refatoração Crítica)
