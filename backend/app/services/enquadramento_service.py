@@ -33,19 +33,22 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
             """), {"ano": ano}).mappings().all()
 
             if not faixas_db:
-                # Fallback: tentar pegar do ano anterior se houver
-                logger.info(f"Sem faixas para {ano}, tentando fallback...")
-                faixas_db = db.execute(text("""
-                    SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior, aliquota
-                    FROM sim_faixas_aliquota 
-                    WHERE simulacao_id IS NULL
-                    ORDER BY exercicio DESC, categoria, limite_inferior
-                    LIMIT 20
-                """)).mappings().all()
+                # Fallback inteligente: pegar o último ano que possui faixas cadastradas
+                logger.info(f"Sem faixas para {ano}, buscando último ano disponível para fallback...")
+                ultimo_ano_row = db.execute(text("SELECT MAX(exercicio) FROM sim_faixas_aliquota WHERE simulacao_id IS NULL")).scalar()
+                if ultimo_ano_row:
+                    faixas_db = db.execute(text("""
+                        SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior, aliquota
+                        FROM sim_faixas_aliquota 
+                        WHERE exercicio = :ua AND simulacao_id IS NULL
+                        ORDER BY categoria, limite_inferior
+                    """), {"ua": ultimo_ano_row}).mappings().all()
             
             if not faixas_db:
-                logger.error(f"Nenhuma faixa de alíquota encontrada no banco para classificar o ano {ano}.")
+                print(f"❌ Nenhuma faixa de alíquota encontrada para o ano {ano} ou fallback.")
                 continue
+
+            print(f"📌 Encontradas {len(faixas_db)} faixas para processar o ano {ano}.")
 
             # Organizar faixas por categoria
             faixas_por_cat = {}
@@ -55,10 +58,7 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                 faixas_por_cat[cat].append(f)
 
             # 2. Processar em lotes para não estourar a memória
-            # Vamos classificar categoria por categoria para ser mais eficiente
             for cat_nome, faixas in faixas_por_cat.items():
-                logger.info(f"Processando categoria {cat_nome} no ano {ano}...")
-                
                 # Mapear categoria para filtros SQL do Postgres
                 filtro_uso = ""
                 if cat_nome == "Residencial":
@@ -68,7 +68,7 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                 elif cat_nome == "Territorial":
                     filtro_uso = 'AND "TIPO_IMPOSTO_LAN" = 2'
 
-                # Resetar faixas antes de começar (para garantir limpeza)
+                # Resetar faixas antes de começar
                 db.execute(text(f"""
                     UPDATE "SIA_LANCIPTU_ASG" 
                     SET faixa_codigo = NULL, faixa_label = NULL
@@ -83,18 +83,17 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                     f_lab = f["faixa_label"]
 
                     # Atualizar imóveis que caem nesta faixa
-                    # Nota: Usamos VALR_VENAL_LAN para o histórico real
                     sql_update = text(f"""
                         UPDATE "SIA_LANCIPTU_ASG"
                         SET faixa_codigo = :f_cod,
                             faixa_label = :f_lab
                         WHERE "CODG_EXERCICIO_LAN" = :ano
                           {filtro_uso}
-                          AND CAST("VALR_VENAL_LAN" AS NUMERIC) >= :inf
-                          AND CAST("VALR_VENAL_LAN" AS NUMERIC) < :sup
+                          AND CAST(REPLACE(CAST("VALR_VENAL_LAN" AS TEXT), ',', '.') AS NUMERIC) >= :inf
+                          AND CAST(REPLACE(CAST("VALR_VENAL_LAN" AS TEXT), ',', '.') AS NUMERIC) < :sup
                     """)
                     
-                    db.execute(sql_update, {
+                    res = db.execute(sql_update, {
                         "ano": ano,
                         "f_cod": f_cod,
                         "f_lab": f_lab,
@@ -102,8 +101,10 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
                         "sup": lim_sup
                     })
                     db.commit()
+                    if res.rowcount > 0:
+                        print(f"   ✅ {cat_nome} | Faixa {f_cod}: {res.rowcount} imóveis enquadrados.")
             
-        logger.info("Classificação de faixas concluída com sucesso.")
+        print("🚀 Classificação de faixas concluída com sucesso.")
         return True
     except Exception as e:
         logger.error(f"Erro na classificação de faixas: {e}")
