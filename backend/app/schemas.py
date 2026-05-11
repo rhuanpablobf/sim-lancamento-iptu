@@ -110,6 +110,7 @@ class SimulacaoLer(SimulacaoCriar):
     total_imoveis: Optional[int] = None
     total_processados: int = 0
     exercicio_atual: Optional[int] = None
+    mensagem_status: Optional[str] = None
     progresso_json: Optional[list] = None
     erro_mensagem: Optional[str] = None
     criado_em: Optional[datetime] = None

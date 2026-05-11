@@ -81,6 +81,7 @@ class Simulacao(Base):
     total_imoveis    = Column(Integer)
     total_processados = Column(Integer, default=0)
     exercicio_atual  = Column(SmallInteger)
+    mensagem_status  = Column(String(100))
     progresso_json   = Column(JSONB, default=list)  # lista de exercícios concluídos
     erro_mensagem    = Column(Text)
     criado_em        = Column(DateTime, default=datetime.utcnow)

@@ -166,10 +166,14 @@ export default function SimulacoesPage() {
                                 <span style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: "10px", fontWeight: 700, textShadow: "0 0 2px white" }}>{pct}%</span>
                               </div>
                               {tempo && typeof tempo === 'object' && (
-                                <div style={{ display: "flex", gap: "6px", fontSize: "10px", color: "var(--text-muted)", marginTop: "4px" }}>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", fontSize: "10px", color: "var(--text-muted)", marginTop: "4px" }}>
+                                  <span className="fw-600" style={{ color: "var(--blue-txt)" }}>
+                                    {s.mensagem_status || "Calculando lançamentos..."}
+                                  </span>
+                                  <span>•</span>
                                   <span>⏱ {tempo.decorrido} decorridos</span>
                                   <span>•</span>
-                                  <span className="fw-600" style={{ color: "var(--blue-txt)" }}>restam {tempo.restante}</span>
+                                  <span className="fw-600">restam {tempo.restante}</span>
                                 </div>
                               )}
                             </div>

@@ -39,6 +39,8 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
                     simulacao.exercicio_atual = valor
                 elif campo == "status":
                     simulacao.status = valor
+                elif campo == "mensagem":
+                    simulacao.mensagem_status = valor
             db.commit()
 
         # 1. Carregar faixas base (conforme ano escolhido na simulação)
@@ -132,6 +134,9 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
 
         # 5. Sincronizar com ClickHouse para Dashboard Ultrarápido
         try:
+            msg_ch = '[CLICKHOUSE] Sincronizando resultados para o Dashboard...'
+            atualizar_progresso(mensagem=msg_ch)
+            self.update_state(state='PROGRESS', meta={'progresso': 99, 'mensagem': msg_ch})
             sincronizar_simulacao_para_clickhouse(simulacao_id, db)
         except Exception as e:
             import logging
