@@ -25,24 +25,23 @@ def classificar_faixas_base_real(db: Session, anos: list = None):
             logger.info(f"Classificando faixas para o exercício {ano}...")
             
             # 1. Carregar faixas de referência para este ano (ou do ano mais próximo se não houver)
+            # 1. Buscar faixas na tabela de REFERÊNCIA (sim_faixas_referencia)
+            # Esta tabela contém as faixas oficiais do Código Tributário para o histórico
             faixas_db = db.execute(text("""
                 SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior, aliquota
-                FROM sim_faixas_aliquota 
-                WHERE exercicio = :ano AND simulacao_id IS NULL
+                FROM sim_faixas_referencia 
                 ORDER BY categoria, limite_inferior
-            """), {"ano": ano}).mappings().all()
+            """)).mappings().all()
 
             if not faixas_db:
-                # Fallback inteligente: pegar o último ano que possui faixas cadastradas
-                logger.info(f"Sem faixas para {ano}, buscando último ano disponível para fallback...")
-                ultimo_ano_row = db.execute(text("SELECT MAX(exercicio) FROM sim_faixas_aliquota WHERE simulacao_id IS NULL")).scalar()
-                if ultimo_ano_row:
-                    faixas_db = db.execute(text("""
-                        SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior, aliquota
-                        FROM sim_faixas_aliquota 
-                        WHERE exercicio = :ua AND simulacao_id IS NULL
-                        ORDER BY categoria, limite_inferior
-                    """), {"ua": ultimo_ano_row}).mappings().all()
+                # Fallback: se a tabela de referência não existir/vazia, tenta as alíquotas base da simulação
+                logger.info(f"Sem faixas em sim_faixas_referencia para {ano}, tentando sim_faixas_aliquota...")
+                faixas_db = db.execute(text("""
+                    SELECT categoria, faixa_codigo, faixa_label, limite_inferior, limite_superior, aliquota
+                    FROM sim_faixas_aliquota 
+                    WHERE (exercicio = :ano OR exercicio IS NULL) AND simulacao_id IS NULL
+                    ORDER BY categoria, limite_inferior
+                """), {"ano": ano}).mappings().all()
             
             if not faixas_db:
                 print(f"❌ Nenhuma faixa de alíquota encontrada para o ano {ano} ou fallback.")
