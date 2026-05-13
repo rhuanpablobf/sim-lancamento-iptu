@@ -256,6 +256,30 @@ def migrar():
                 })
             conn.commit()
 
+            conn.commit()
+
+        # --------------------------------------------------------------------------------
+        # SANEAMENTO AUTOMÁTICO DE FAIXAS (Notebooks e Novos Ambientes)
+        # --------------------------------------------------------------------------------
+        # Caso a tabela sim_faixas_aliquota tenha recebido um dump/seeder antigo
+        # em que faixa_codigo e faixa_label estão NULL, isso quebra a simulação.
+        # Nós usamos a sim_faixas_referencia criada acima para tapar esse buraco.
+        print("Saneando possíveis faixas nulas em sim_faixas_aliquota...")
+        try:
+            res = conn.execute(text("""
+                UPDATE sim_faixas_aliquota a 
+                SET faixa_codigo = r.faixa_codigo, 
+                    faixa_label = r.faixa_label 
+                FROM sim_faixas_referencia r 
+                WHERE a.categoria = r.categoria 
+                  AND a.aliquota = r.aliquota 
+                  AND a.faixa_codigo IS NULL;
+            """))
+            conn.commit()
+            if res.rowcount > 0:
+                print(f"Saneamento concluído: {res.rowcount} faixas base corrigidas.")
+        except Exception as e:
+            print(f"Erro ao sanear sim_faixas_aliquota: {e}")
 
     print("Migração concluída.")
 
