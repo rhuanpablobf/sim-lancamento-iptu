@@ -196,6 +196,66 @@ def migrar():
             conn.execute(text('CREATE INDEX IF NOT EXISTS "idx_isn_aux_auditoria" ON "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" ("ISN_SIA_LANCIPTU_ASG")'))
             conn.commit()
 
+        # Garantir que a tabela sim_faixas_referencia exista e tenha os dados base
+        if "sim_faixas_referencia" not in tabelas_atuais:
+            print("Criando tabela sim_faixas_referencia (gabarito CTM)...")
+            conn.execute(text("""
+                CREATE TABLE "sim_faixas_referencia" (
+                    "id" SERIAL PRIMARY KEY,
+                    "categoria" VARCHAR(20) NOT NULL,
+                    "faixa_codigo" VARCHAR(10) NOT NULL,
+                    "faixa_label" VARCHAR(60) NOT NULL,
+                    "faixa_ordem" SMALLINT NOT NULL,
+                    "aliquota" NUMERIC(7,5) NOT NULL,
+                    "tipo_imposto" SMALLINT NOT NULL,
+                    CONSTRAINT "uq_faixa_ref" UNIQUE ("categoria", "aliquota", "tipo_imposto")
+                )
+            """))
+            conn.commit()
+
+            print("Semeando dados na tabela sim_faixas_referencia...")
+            faixas_referencia = [
+                ("NAO_RESIDENCIAL", "NR-F1", "Faixa 1 - Até R$ 200.000", 1, 0.00750, 1),
+                ("NAO_RESIDENCIAL", "NR-F2", "Faixa 2 - R$ 200k a R$ 300k", 2, 0.00800, 1),
+                ("NAO_RESIDENCIAL", "NR-F3", "Faixa 3 - R$ 300k a R$ 500k", 3, 0.00850, 1),
+                ("NAO_RESIDENCIAL", "NR-F4", "Faixa 4 - R$ 500k a R$ 700k", 4, 0.00900, 1),
+                ("NAO_RESIDENCIAL", "NR-F5", "Faixa 5 - R$ 700k a R$ 1mi", 5, 0.00950, 1),
+                ("NAO_RESIDENCIAL", "NR-F6", "Faixa 6 - Acima de R$ 1mi", 6, 0.01000, 1),
+                ("RESIDENCIAL", "RES-F1", "Faixa 1 - Até R$ 200.000", 1, 0.00150, 1),
+                ("RESIDENCIAL", "RES-F2", "Faixa 2 - R$ 200k a R$ 300k", 2, 0.00200, 1),
+                ("RESIDENCIAL", "RES-F3", "Faixa 3 - R$ 300k a R$ 500k", 3, 0.00290, 1),
+                ("RESIDENCIAL", "RES-F4", "Faixa 4 - R$ 500k a R$ 700k", 4, 0.00400, 1),
+                ("RESIDENCIAL", "RES-F5", "Faixa 5 - R$ 700k a R$ 1mi", 5, 0.00500, 1),
+                ("RESIDENCIAL", "RES-F6", "Faixa 6 - Acima de R$ 1mi", 6, 0.00550, 1),
+                ("TERRITORIAL", "TER-F1", "Faixa 1 - Até R$ 40.000", 1, 0.00990, 2),
+                ("TERRITORIAL", "TER-F1", "Faixa 1 - Até R$ 40.000", 1, 0.01000, 2),
+                ("TERRITORIAL", "TER-F1", "Faixa 1 - Até R$ 40.000", 1, 0.02000, 2),
+                ("TERRITORIAL", "TER-F2", "Faixa 2 - R$ 40k a R$ 60k", 2, 0.01300, 2),
+                ("TERRITORIAL", "TER-F2", "Faixa 2 - R$ 40k a R$ 60k", 2, 0.02300, 2),
+                ("TERRITORIAL", "TER-F3", "Faixa 3 - R$ 60k a R$ 80k", 3, 0.01600, 2),
+                ("TERRITORIAL", "TER-F3", "Faixa 3 - R$ 60k a R$ 80k", 3, 0.02600, 2),
+                ("TERRITORIAL", "TER-F4", "Faixa 4 - R$ 80k a R$ 100k", 4, 0.01900, 2),
+                ("TERRITORIAL", "TER-F4", "Faixa 4 - R$ 80k a R$ 100k", 4, 0.02900, 2),
+                ("TERRITORIAL", "TER-F5", "Faixa 5 - R$ 100k a R$ 150k", 5, 0.02200, 2),
+                ("TERRITORIAL", "TER-F5", "Faixa 5 - R$ 100k a R$ 150k", 5, 0.03200, 2),
+                ("TERRITORIAL", "TER-F6", "Faixa 6 - R$ 150k a R$ 300k", 6, 0.02500, 2),
+                ("TERRITORIAL", "TER-F6", "Faixa 6 - R$ 150k a R$ 300k", 6, 0.03500, 2),
+                ("TERRITORIAL", "TER-F7", "Faixa 7 - Acima de R$ 300k", 7, 0.02800, 2),
+                ("TERRITORIAL", "TER-F7", "Faixa 7 - Acima de R$ 300k", 7, 0.03800, 2),
+            ]
+            
+            sql_insert = text("""
+                INSERT INTO sim_faixas_referencia (categoria, faixa_codigo, faixa_label, faixa_ordem, aliquota, tipo_imposto)
+                VALUES (:cat, :cod, :lbl, :ordem, :aliq, :tipo)
+                ON CONFLICT (categoria, aliquota, tipo_imposto) DO NOTHING
+            """)
+            
+            for f in faixas_referencia:
+                conn.execute(sql_insert, {
+                    "cat": f[0], "cod": f[1], "lbl": f[2], "ordem": f[3], "aliq": f[4], "tipo": f[5]
+                })
+            conn.commit()
+
 
     print("Migração concluída.")
 

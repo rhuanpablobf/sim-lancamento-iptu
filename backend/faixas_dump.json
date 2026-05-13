@@ -1,0 +1,218 @@
+[
+  {
+    "categoria": "NAO_RESIDENCIAL",
+    "faixa_codigo": "NR-F1",
+    "faixa_label": "Faixa 1 ??? At?? R$ 200.000",
+    "faixa_ordem": 1,
+    "aliquota": 0.0075,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "NAO_RESIDENCIAL",
+    "faixa_codigo": "NR-F2",
+    "faixa_label": "Faixa 2 ??? R$ 200k a R$ 300k",
+    "faixa_ordem": 2,
+    "aliquota": 0.008,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "NAO_RESIDENCIAL",
+    "faixa_codigo": "NR-F3",
+    "faixa_label": "Faixa 3 ??? R$ 300k a R$ 500k",
+    "faixa_ordem": 3,
+    "aliquota": 0.0085,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "NAO_RESIDENCIAL",
+    "faixa_codigo": "NR-F4",
+    "faixa_label": "Faixa 4 ??? R$ 500k a R$ 700k",
+    "faixa_ordem": 4,
+    "aliquota": 0.009,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "NAO_RESIDENCIAL",
+    "faixa_codigo": "NR-F5",
+    "faixa_label": "Faixa 5 ??? R$ 700k a R$ 1mi",
+    "faixa_ordem": 5,
+    "aliquota": 0.0095,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "NAO_RESIDENCIAL",
+    "faixa_codigo": "NR-F6",
+    "faixa_label": "Faixa 6 ??? Acima de R$ 1mi",
+    "faixa_ordem": 6,
+    "aliquota": 0.01,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "RESIDENCIAL",
+    "faixa_codigo": "RES-F1",
+    "faixa_label": "Faixa 1 ??? At?? R$ 200.000",
+    "faixa_ordem": 1,
+    "aliquota": 0.0015,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "RESIDENCIAL",
+    "faixa_codigo": "RES-F2",
+    "faixa_label": "Faixa 2 ??? R$ 200k a R$ 300k",
+    "faixa_ordem": 2,
+    "aliquota": 0.002,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "RESIDENCIAL",
+    "faixa_codigo": "RES-F3",
+    "faixa_label": "Faixa 3 ??? R$ 300k a R$ 500k",
+    "faixa_ordem": 3,
+    "aliquota": 0.0029,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "RESIDENCIAL",
+    "faixa_codigo": "RES-F4",
+    "faixa_label": "Faixa 4 ??? R$ 500k a R$ 700k",
+    "faixa_ordem": 4,
+    "aliquota": 0.004,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "RESIDENCIAL",
+    "faixa_codigo": "RES-F5",
+    "faixa_label": "Faixa 5 ??? R$ 700k a R$ 1mi",
+    "faixa_ordem": 5,
+    "aliquota": 0.005,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "RESIDENCIAL",
+    "faixa_codigo": "RES-F6",
+    "faixa_label": "Faixa 6 ??? Acima de R$ 1mi",
+    "faixa_ordem": 6,
+    "aliquota": 0.0055,
+    "tipo_imposto": 1
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F1",
+    "faixa_label": "Faixa 1 ??? At?? R$ 40.000",
+    "faixa_ordem": 1,
+    "aliquota": 0.0099,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F1",
+    "faixa_label": "Faixa 1 ??? At?? R$ 40.000",
+    "faixa_ordem": 1,
+    "aliquota": 0.01,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F1",
+    "faixa_label": "Faixa 1 ??? At?? R$ 40.000",
+    "faixa_ordem": 1,
+    "aliquota": 0.02,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F2",
+    "faixa_label": "Faixa 2 ??? R$ 40k a R$ 60k",
+    "faixa_ordem": 2,
+    "aliquota": 0.013,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F2",
+    "faixa_label": "Faixa 2 ??? R$ 40k a R$ 60k",
+    "faixa_ordem": 2,
+    "aliquota": 0.023,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F3",
+    "faixa_label": "Faixa 3 ??? R$ 60k a R$ 80k",
+    "faixa_ordem": 3,
+    "aliquota": 0.016,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F3",
+    "faixa_label": "Faixa 3 ??? R$ 60k a R$ 80k",
+    "faixa_ordem": 3,
+    "aliquota": 0.026,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F4",
+    "faixa_label": "Faixa 4 ??? R$ 80k a R$ 100k",
+    "faixa_ordem": 4,
+    "aliquota": 0.019,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F4",
+    "faixa_label": "Faixa 4 ??? R$ 80k a R$ 100k",
+    "faixa_ordem": 4,
+    "aliquota": 0.029,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F5",
+    "faixa_label": "Faixa 5 ??? R$ 100k a R$ 150k",
+    "faixa_ordem": 5,
+    "aliquota": 0.022,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F5",
+    "faixa_label": "Faixa 5 ??? R$ 100k a R$ 150k",
+    "faixa_ordem": 5,
+    "aliquota": 0.032,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F6",
+    "faixa_label": "Faixa 6 ??? R$ 150k a R$ 300k",
+    "faixa_ordem": 6,
+    "aliquota": 0.025,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F6",
+    "faixa_label": "Faixa 6 ??? R$ 150k a R$ 300k",
+    "faixa_ordem": 6,
+    "aliquota": 0.035,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F7",
+    "faixa_label": "Faixa 7 ??? Acima de R$ 300k",
+    "faixa_ordem": 7,
+    "aliquota": 0.028,
+    "tipo_imposto": 2
+  },
+  {
+    "categoria": "TERRITORIAL",
+    "faixa_codigo": "TER-F7",
+    "faixa_label": "Faixa 7 ??? Acima de R$ 300k",
+    "faixa_ordem": 7,
+    "aliquota": 0.038,
+    "tipo_imposto": 2
+  }
+]
