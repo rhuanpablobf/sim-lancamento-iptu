@@ -65,6 +65,7 @@ def criar_simulacao(payload: SimulacaoCriar, db: Session = Depends(obter_sessao)
         indexador_social=payload.indexador_social.upper(),
         indexador_minimo=payload.indexador_minimo.upper(),
         aplicar_cap=payload.aplicar_cap,
+        tipo_cap=payload.tipo_cap,
         status="PENDENTE",
         progresso_json=[],
     )

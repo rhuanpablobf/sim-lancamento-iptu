@@ -165,6 +165,7 @@ def simular_exercicio(
     indexador_social: str = "SELIC",
     indexador_minimo: str = "SELIC",
     aplicar_cap: bool = True,
+    tipo_cap: str = "INFLACAO_MAIS_5",
 ) -> tuple[pd.DataFrame, float, float]:
     """
     Processa um exercício completo, aplicando todas as regras do CTM Goiânia.
@@ -223,9 +224,13 @@ def simular_exercicio(
     # ETAPA 3 — Imposto bruto
     df["valr_iptu_bruto"] = df["valr_venal_simulado"] * df["valr_aliquota_calculada"]
 
-    # ETAPA 4 — Cap de 5% (Art. 168 §6º)
+    # ETAPA 4 — Cap de 5% (Art. 168 §6º) ou Apenas Inflação
     if aplicar_cap and "VALR_IMPOSTO_LAN" in df.columns:
-        limite_cap = df["VALR_IMPOSTO_LAN"].astype(float) * 1.05 * (1 + ipca)
+        if tipo_cap == "APENAS_INFLACAO":
+            limite_cap = df["VALR_IMPOSTO_LAN"].astype(float) * (1 + ipca)
+        else:
+            limite_cap = df["VALR_IMPOSTO_LAN"].astype(float) * 1.05 * (1 + ipca)
+            
         df["valr_iptu_cap"] = np.minimum(df["valr_iptu_bruto"], limite_cap)
     else:
         df["valr_iptu_cap"] = df["valr_iptu_bruto"]
@@ -299,6 +304,7 @@ def executar_motor_completo(
     indexador_social: str = "SELIC",
     indexador_minimo: str = "SELIC",
     aplicar_cap: bool = True,
+    tipo_cap: str = "INFLACAO_MAIS_5",
     atualizar_progresso: callable = None,
 ) -> None:
     """
@@ -409,6 +415,7 @@ def executar_motor_completo(
             indexador_social=indexador_social,
             indexador_minimo=indexador_minimo,
             aplicar_cap=aplicar_cap,
+            tipo_cap=tipo_cap,
         )
 
         # Salvar parâmetros de auditoria

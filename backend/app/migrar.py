@@ -45,6 +45,16 @@ def migrar():
                 except Exception as e:
                     print(f"Erro ao adicionar {col}: {e}")
 
+        # Verificar sim_simulacoes
+        colunas_simulacoes = [c["name"] for c in inspector.get_columns("sim_simulacoes")]
+        if "tipo_cap" not in colunas_simulacoes:
+            print("Adicionando coluna tipo_cap em sim_simulacoes...")
+            try:
+                conn.execute(text("ALTER TABLE sim_simulacoes ADD COLUMN tipo_cap VARCHAR(20) DEFAULT 'INFLACAO_MAIS_5'"))
+                conn.commit()
+            except Exception as e:
+                print(f"Erro ao adicionar tipo_cap em sim_simulacoes: {e}")
+
         # Corrigir sim_faixas_aliquota se necessário
         colunas_faixas = [c["name"] for c in inspector.get_columns("sim_faixas_aliquota")]
         colunas_nec_faixas = {

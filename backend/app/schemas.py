@@ -101,7 +101,7 @@ class SimulacaoCriar(BaseModel):
     indexador_social: str = "SELIC"
     indexador_minimo: str = "SELIC"
     aplicar_cap: bool = True
-
+    tipo_cap: str = "INFLACAO_MAIS_5"
 
 class SimulacaoLer(SimulacaoCriar):
     model_config = ConfigDict(from_attributes=True)

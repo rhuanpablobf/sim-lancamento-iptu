@@ -76,6 +76,7 @@ class Simulacao(Base):
     indexador_social = Column(String(10), default="SELIC") # SELIC | IPCA
     indexador_minimo = Column(String(10), default="SELIC") # SELIC | IPCA
     aplicar_cap      = Column(Boolean, default=True)
+    tipo_cap         = Column(String(20), default="INFLACAO_MAIS_5") # INFLACAO_MAIS_5 | APENAS_INFLACAO
     status           = Column(String(15), default="PENDENTE")
     # PENDENTE | PROCESSANDO | CONCLUIDO | ERRO
     total_imoveis    = Column(Integer)

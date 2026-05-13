@@ -129,6 +129,7 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
             indexador_social=simulacao.indexador_social,
             indexador_minimo=simulacao.indexador_minimo,
             aplicar_cap=simulacao.aplicar_cap,
+            tipo_cap=simulacao.tipo_cap,
             atualizar_progresso=atualizar_progresso,
         )
 

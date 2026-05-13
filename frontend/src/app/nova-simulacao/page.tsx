@@ -11,6 +11,8 @@ export default function NovaSimulacaoPage() {
   const [cenario, setCenario] = useState("SELIC");
   const [indexadorSocial, setIndexadorSocial] = useState("SELIC");
   const [indexadorMinimo, setIndexadorMinimo] = useState("SELIC");
+  const [aplicarCap, setAplicarCap] = useState(true);
+  const [tipoCap, setTipoCap] = useState("INFLACAO_MAIS_5");
   const [executando, setExecutando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -42,7 +44,8 @@ export default function NovaSimulacaoPage() {
           cenario: cenario,
           indexador_social: indexadorSocial,
           indexador_minimo: indexadorMinimo,
-          aplicar_cap: formData.get("aplicar_cap") === "on",
+          aplicar_cap: aplicarCap,
+          tipo_cap: tipoCap,
         }),
       });
       router.push(`/simulacoes/${res.dados.id}`);
@@ -164,17 +167,55 @@ export default function NovaSimulacaoPage() {
             <div className="card mb-16">
               <div className="card-header"><div className="card-title">Regras de negócio</div></div>
               <div className="card-body">
-                <div className="mb-20" style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                  <input type="checkbox" name="aplicar_cap" id="cap" defaultChecked style={{ marginTop: "4px" }} />
-                  <div>
-                    <label htmlFor="cap" className="fw-600 text-sm" style={{ display: "block", marginBottom: "4px", cursor: "pointer" }}>
-                      Aplicar cap de transição (+5% acima da inflação)
-                    </label>
-                    <div className="text-xs text-muted" style={{ lineHeight: "1.4" }}>
-                      Limita o acréscimo do imposto em relação ao ano anterior, conforme Art. 168 §6º CTM. 
-                      O cálculo considera: (Imposto {anos.base}) x 1.05 x (Inflação Acumulada).
+                <div className="mb-20" style={{ display: "flex", gap: "12px", alignItems: "flex-start", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: "12px", alignItems: "flex-start", width: "100%" }}>
+                    <input 
+                      type="checkbox" 
+                      id="cap" 
+                      checked={aplicarCap}
+                      onChange={e => setAplicarCap(e.target.checked)}
+                      style={{ marginTop: "4px" }} 
+                    />
+                    <div>
+                      <label htmlFor="cap" className="fw-600 text-sm" style={{ display: "block", marginBottom: "4px", cursor: "pointer" }}>
+                        Aplicar limite de transição (CAP)
+                      </label>
+                      <div className="text-xs text-muted" style={{ lineHeight: "1.4" }}>
+                        Limita o acréscimo do imposto em relação ao ano anterior.
+                      </div>
                     </div>
                   </div>
+                  
+                  {aplicarCap && (
+                    <div style={{ width: "100%", paddingLeft: "25px", marginTop: "4px" }}>
+                      <div className="radio-group" style={{ display: "flex", gap: "8px" }}>
+                        <div 
+                          className={`radio-option ${tipoCap === 'INFLACAO_MAIS_5' ? 'selected' : ''}`}
+                          onClick={() => setTipoCap('INFLACAO_MAIS_5')}
+                          style={{ 
+                            flex: 1, cursor: "pointer", padding: "10px", border: "1px solid var(--border)", borderRadius: "8px",
+                            borderColor: tipoCap === 'INFLACAO_MAIS_5' ? "var(--blue-txt)" : "var(--border)",
+                            background: tipoCap === 'INFLACAO_MAIS_5' ? "white" : "transparent"
+                          }}
+                        >
+                          <div className="fw-600 text-sm">Inflação + 5%</div>
+                          <div className="text-xs text-muted">Art. 168 §6º CTM</div>
+                        </div>
+                        <div 
+                          className={`radio-option ${tipoCap === 'APENAS_INFLACAO' ? 'selected' : ''}`}
+                          onClick={() => setTipoCap('APENAS_INFLACAO')}
+                          style={{ 
+                            flex: 1, cursor: "pointer", padding: "10px", border: "1px solid var(--border)", borderRadius: "8px",
+                            borderColor: tipoCap === 'APENAS_INFLACAO' ? "var(--blue-txt)" : "var(--border)",
+                            background: tipoCap === 'APENAS_INFLACAO' ? "white" : "transparent"
+                          }}
+                        >
+                          <div className="fw-600 text-sm">Apenas Inflação (IPCA)</div>
+                          <div className="text-xs text-muted">Acréscimo zero real</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid-2">
