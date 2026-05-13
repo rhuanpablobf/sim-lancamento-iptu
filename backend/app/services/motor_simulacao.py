@@ -141,8 +141,11 @@ def _enquadrar_faixas_vetorizado(df: pd.DataFrame, faixas: list, coluna_valor: s
             mask_enquadrar = mask_cat & mask_valor & (aliquotas_atuais == -1.0)
             
             if np.any(mask_enquadrar):
-                df.loc[mask_enquadrar, "faixa_atual"] = str(faixa["faixa_codigo"])
-                df.loc[mask_enquadrar, "faixa_label"] = faixa["faixa_label"]
+                # Proteção extra: se faixa_codigo for null/None no DB (ex: faixa única Territorial),
+                # guardamos a label ou um fallback adequado ("UNICA" por ex), para evitar a string 'None'
+                codigo_seguro = str(faixa["faixa_codigo"]) if faixa["faixa_codigo"] is not None else "UNICA"
+                df.loc[mask_enquadrar, "faixa_atual"] = codigo_seguro
+                df.loc[mask_enquadrar, "faixa_label"] = faixa["faixa_label"] or ("Faixa Única" if codigo_seguro == "UNICA" else f"Faixa {codigo_seguro}")
                 df.loc[mask_enquadrar, "valr_aliquota_calculada"] = float(faixa["aliquota"])
 
     # Quem sobrou com -1.0 recebe 0.0 de alíquota
@@ -183,11 +186,15 @@ def simular_exercicio(
     # Garantia contra colunas duplicadas que impediriam cálculos vetorizados
     df = df.loc[:, ~df.columns.duplicated()].copy()
 
-    # Categoria tributária
+    # Categoria tributária: precisa cast para numérico já que os dados do banco podem ser strings '1', '2'
+    # Tratando NaN/null como 0 temporariamente para a conversão ser segura
+    tipo_imposto = pd.to_numeric(df["TIPO_IMPOSTO_LAN"], errors="coerce").fillna(0).astype(int)
+    info_uso = pd.to_numeric(df["INFO_USO_LAN"], errors="coerce").fillna(0).astype(int)
+    
     condicoes_cat = [
-        df["TIPO_IMPOSTO_LAN"] == 2,    # TERRITORIAL (inclui em construção)
-        (df["TIPO_IMPOSTO_LAN"] == 1) & (df["INFO_USO_LAN"] == 1),   # RESIDENCIAL
-        (df["TIPO_IMPOSTO_LAN"] == 1) & (df["INFO_USO_LAN"] != 1),   # NÃO RESIDENCIAL
+        tipo_imposto == 2,    # TERRITORIAL (inclui em construção)
+        (tipo_imposto == 1) & (info_uso == 1),   # RESIDENCIAL
+        (tipo_imposto == 1) & (info_uso != 1),   # NÃO RESIDENCIAL
     ]
     escolhas_cat = ["TERRITORIAL", "RESIDENCIAL", "NAO_RESIDENCIAL"]
     df["categoria_tributacao"] = np.select(condicoes_cat, escolhas_cat, default="RESIDENCIAL")
@@ -460,7 +467,7 @@ def executar_motor_completo(
             atualizar_progresso(exercicios_concluidos=exercicios_concluidos)
 
         # Preparar base para o próximo ano e LIMPAR RAM
-        cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN"]
+        cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN", "valr_venal_social_base"]
         df_corrente = df_resultado.drop(columns=[c for c in cols_base_antigas if c in df_resultado.columns])
         df_corrente = df_corrente.rename(columns={
             "valr_venal_simulado": "VALR_VENAL_LAN",

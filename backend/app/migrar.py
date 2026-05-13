@@ -24,10 +24,14 @@ def migrar():
             "exercicio_destino": "SMALLINT",
             "ano_base_faixas": "SMALLINT",
             "cenario": "VARCHAR(10)",
+            "indexador_social": "VARCHAR(10) DEFAULT 'SELIC'",
+            "indexador_minimo": "VARCHAR(10) DEFAULT 'SELIC'",
             "aplicar_cap": "BOOLEAN DEFAULT TRUE",
+            "status": "VARCHAR(15) DEFAULT 'PENDENTE'",
             "total_imoveis": "INTEGER",
             "total_processados": "INTEGER DEFAULT 0",
             "exercicio_atual": "SMALLINT",
+            "mensagem_status": "VARCHAR(100)",
             "progresso_json": "JSONB DEFAULT '[]'::jsonb",
             "erro_mensagem": "TEXT"
         }
@@ -41,12 +45,31 @@ def migrar():
                 except Exception as e:
                     print(f"Erro ao adicionar {col}: {e}")
 
-        # Corrigir sim_faixas_aliquota se necessário (adicionada recentemente)
+        # Corrigir sim_faixas_aliquota se necessário
         colunas_faixas = [c["name"] for c in inspector.get_columns("sim_faixas_aliquota")]
-        if "origem" not in colunas_faixas:
-            print("Adicionando coluna origem em sim_faixas_aliquota...")
-            conn.execute(text("ALTER TABLE sim_faixas_aliquota ADD COLUMN origem VARCHAR(10) DEFAULT 'MANUAL'"))
-            conn.commit()
+        colunas_nec_faixas = {
+            "origem": "VARCHAR(20) DEFAULT 'MANUAL'",
+            "simulacao_id": "UUID REFERENCES sim_simulacoes(id) ON DELETE CASCADE",
+            "faixa_codigo": "VARCHAR(20)",
+            "faixa_label": "VARCHAR(100)"
+        }
+        for col, tipo in colunas_nec_faixas.items():
+            if col not in colunas_faixas:
+                print(f"Adicionando coluna {col} em sim_faixas_aliquota...")
+                try:
+                    conn.execute(text(f"ALTER TABLE sim_faixas_aliquota ADD COLUMN {col} {tipo}"))
+                    conn.commit()
+                except Exception as e:
+                    print(f"Erro ao adicionar {col} em sim_faixas_aliquota: {e}")
+            else:
+                # Verificar se o tipo precisa de ajuste (especialmente o tamanho do VARCHAR)
+                if col == "origem":
+                    print(f"Ajustando tamanho da coluna {col} em sim_faixas_aliquota para VARCHAR(20)...")
+                    try:
+                        conn.execute(text(f"ALTER TABLE sim_faixas_aliquota ALTER COLUMN {col} TYPE VARCHAR(20)"))
+                        conn.commit()
+                    except Exception as e:
+                        print(f"Erro ao ajustar {col} em sim_faixas_aliquota: {e}")
 
         # Verificar sim_parametros
         colunas_params = [c["name"] for c in inspector.get_columns("sim_parametros")]
@@ -57,13 +80,6 @@ def migrar():
                 conn.execute(text(f"ALTER TABLE sim_parametros DROP COLUMN {col}"))
         conn.commit()
 
-        # Verificar sim_simulacoes
-        colunas_sim = [c["name"] for c in inspector.get_columns("sim_simulacoes")]
-        if "indexador_social" not in colunas_sim:
-            conn.execute(text("ALTER TABLE sim_simulacoes ADD COLUMN indexador_social VARCHAR(10) DEFAULT 'SELIC'"))
-        if "indexador_minimo" not in colunas_sim:
-            conn.execute(text("ALTER TABLE sim_simulacoes ADD COLUMN indexador_minimo VARCHAR(10) DEFAULT 'SELIC'"))
-        conn.commit()
 
         # Verificar sim_lancamentos (onde ocorreu o erro relatado)
         colunas_lancamentos = [c["name"] for c in inspector.get_columns("sim_lancamentos")]
@@ -90,6 +106,16 @@ def migrar():
                     conn.commit()
                 except Exception as e:
                     print(f"Erro ao adicionar {col} em sim_lancamentos: {e}")
+            else:
+                # Corrigir tipos se necessário (especialmente faixas que eram INTEGER no init.sql)
+                if col in ["faixa_anterior", "faixa_atual"]:
+                    print(f"Verificando/Corrigindo tipo da coluna {col} em sim_lancamentos para VARCHAR(20)...")
+                    try:
+                        # Mudança segura de INTEGER para VARCHAR
+                        conn.execute(text(f"ALTER TABLE sim_lancamentos ALTER COLUMN {col} TYPE VARCHAR(20)"))
+                        conn.commit()
+                    except Exception as e:
+                        print(f"Erro ao ajustar tipo de {col} em sim_lancamentos: {e}")
 
         # Garantir que a tabela SIA_LANCIPTU_ASG exista com o schema COMPLETO
         tabelas_atuais = inspector.get_table_names()
