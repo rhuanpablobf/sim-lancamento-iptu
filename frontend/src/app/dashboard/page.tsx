@@ -40,6 +40,10 @@ interface SimulacaoMin {
   status: string;
   exercicio_base: number;
   exercicio_destino: number;
+  cenario?: string;
+  aplicar_cap?: boolean;
+  tipo_cap?: string;
+  descricao?: string;
 }
 
 // ─── Formatadores ─────────────────────────────────────────────────────────────
@@ -251,6 +255,13 @@ export default function DashboardPage() {
   );
   const resumoConsolidado = respResumo?.dados || [];
 
+  const { data: respParams } = useSWR<{ dados: any[] }>(
+    contexto !== "base" ? `/api/simulacoes/${contexto}/parametros` : null,
+    fetcher
+  );
+  const parametros = respParams?.dados || [];
+  const simulacaoAtiva = simulacoes.find(s => s.id === contexto);
+
   // Inicializa anos do gráfico quando os dados chegam
   useEffect(() => {
     if (d?.arrecadacao_historica) {
@@ -376,7 +387,7 @@ export default function DashboardPage() {
             <select 
               value={contexto} 
               onChange={(e) => setContexto(e.target.value)}
-              style={{ width: "240px" }}
+              style={{ width: "420px" }}
             >
               <option value="base">📍 Base Original (Dados Reais)</option>
               <optgroup label="Simulações Concluídas">
@@ -431,6 +442,31 @@ export default function DashboardPage() {
             <div className="kpi-delta neu">↑ {fmtPct(kpis?.iptu_social || 0, kpis?.total_imoveis || 0)} da base total</div>
           </div>
         </div>
+
+        {/* Índices e Parâmetros (Apenas para Simulação) */}
+        {contexto !== "base" && simulacaoAtiva && respParams?.dados && respParams.dados.length > 0 && (() => {
+          const p = respParams.dados[0];
+          return (
+            <div className="mt-16 text-sm text-muted" style={{ background: "var(--surface-2)", padding: "10px 16px", borderRadius: "8px", border: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span className="fw-600" style={{ color: "var(--txt-1)" }}>Índices:</span>
+              <span>IPCA: {p.ipca_ano}%</span>
+              <span>•</span>
+              <span>SELIC: {p.selic_ano}%</span>
+              <span>•</span>
+              <span>Faixa de Alíquota: {p.tipo_indice_faixa || simulacaoAtiva.cenario}</span>
+              <span>•</span>
+              <span>IPTU Social: {p.tipo_indice_social}</span>
+              <span>•</span>
+              <span>Imposto Mínimo: {p.tipo_indice_minimo}</span>
+              {simulacaoAtiva.aplicar_cap && (
+                <>
+                  <span>•</span>
+                  <span>Aplicar limite de transição (CAP): {simulacaoAtiva.tipo_cap === 'APENAS_INFLACAO' ? 'Apenas Inflação (IPCA)' : 'Inflação + 5%'}</span>
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Filtro de Período para Gráficos */}
         <div className="card mt-16" style={{ padding: "12px 20px" }}>
