@@ -608,6 +608,61 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+        {/* Linha 4: Migração de Faixas e Travados no CAP (Apenas Simulações) */}
+        {contexto !== "base" && (
+          <div className="grid-3 mt-16">
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Caiu de Faixa (Qtd. Imóveis)</div>
+                <div className="badge badge-green">Migração</div>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.desceu_faixa }))} 
+                  valorKey="valor"
+                  height={140}
+                  anoAtivo={anoSelecionado}
+                  fontScale={1.3}
+                  lineWidth={1.3}
+                />
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Subiu de Faixa (Qtd. Imóveis)</div>
+                <div className="badge badge-amber">Migração</div>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.subiu_faixa }))} 
+                  valorKey="valor"
+                  height={140}
+                  anoAtivo={anoSelecionado}
+                  fontScale={1.3}
+                  lineWidth={1.3}
+                />
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
+                <div className="card-title">Travados no Limite (CAP)</div>
+                <div className="badge badge-red">Transição</div>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.na_trava }))} 
+                  valorKey="valor"
+                  height={140}
+                  anoAtivo={anoSelecionado}
+                  fontScale={1.3}
+                  lineWidth={1.3}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
 
         {/* Distribuição por faixa — sempre visível quando há dados */}
