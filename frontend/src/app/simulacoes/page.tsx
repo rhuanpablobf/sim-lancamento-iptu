@@ -10,6 +10,7 @@ interface Simulacao {
   cenario: string;
   exercicio_base: number;
   exercicio_destino: number;
+  descricao?: string;
   total_imoveis?: number;
   total_processados?: number;
   status: string;
@@ -130,7 +131,8 @@ export default function SimulacoesPage() {
             <table>
               <thead>
                 <tr>
-                  <th style={{ width: '30%' }}>Simulação / Cenário</th>
+                  <th style={{ width: '25%' }}>Simulação / Cenário</th>
+                  <th style={{ width: '20%' }}>Descrição</th>
                   <th className="right">Origem</th>
                   <th className="right">Destino</th>
                   <th>Progresso / Tempo</th>
@@ -140,7 +142,7 @@ export default function SimulacoesPage() {
               </thead>
               <tbody>
                 {simulacoes.length === 0 ? (
-                  <tr><td colSpan={6} className="table-empty">{isLoading ? "Carregando..." : "Nenhuma simulação encontrada."}</td></tr>
+                  <tr><td colSpan={7} className="table-empty">{isLoading ? "Carregando..." : "Nenhuma simulação encontrada."}</td></tr>
                 ) : (
                   simulacoes.map((s) => {
                     const badge = BADGE_STATUS[s.status] ?? BADGE_STATUS.PENDENTE;
@@ -154,6 +156,11 @@ export default function SimulacoesPage() {
                           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                             <span className={`badge ${s.cenario === 'SELIC' ? 'badge-blue' : 'badge-gray'}`} style={{ fontSize: '10px' }}>{s.cenario}</span>
                             <span className="text-xs text-muted">{s.total_imoveis?.toLocaleString("pt-BR") ?? "—"} registros</span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="text-muted" style={{ maxWidth: '280px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                            {s.descricao || "—"}
                           </div>
                         </td>
                         <td className="right fw-500">{s.exercicio_base}</td>

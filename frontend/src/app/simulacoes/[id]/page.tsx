@@ -11,6 +11,7 @@ interface SimulacaoDetalhe {
   cenario: string;
   exercicio_base: number;
   exercicio_destino: number;
+  descricao?: string;
   status: string;
   total_imoveis?: number;
   total_processados?: number;
@@ -86,7 +87,8 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
         <div className="page-header-row">
           <div>
             <div className="page-title">{sim?.nome ?? "Estudo de Impacto"}</div>
-            <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+            {sim?.descricao && <div className="text-muted" style={{ fontSize: '13px', fontStyle: 'italic', marginTop: '4px' }}>{sim.descricao}</div>}
+            <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
               {sim && (
                 <>
                   <span className="badge badge-blue">{sim.cenario}</span>
