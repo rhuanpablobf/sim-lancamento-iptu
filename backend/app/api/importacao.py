@@ -270,8 +270,10 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 countIf(tipo_lancamento = 2) AS imposto_minimo,
                 countIf(tipo_lancamento = 3) AS iptu_social,
                 countIf(tipo_lancamento = 4) AS imunes,
-                countIf(categoria = 'Residencial') AS predial,
+                countIf(categoria != 'Territorial') AS predial,
                 countIf(categoria = 'Territorial') AS territorial,
+                countIf(categoria = 'Residencial') AS residencial,
+                countIf(categoria = 'Não Residencial') AS nao_residencial,
                 sum(valr_venal_total) AS valr_venal_total,
                 sum(valr_imposto) AS valr_imposto_total
             FROM lancamento_iptu.historico_lancamentos_analitico
@@ -283,12 +285,15 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             # [LOGICA ORIGINAL DO POSTGRES PARA FALLBACK]
             kpis = db.execute(text("""
                 SELECT COUNT(*) AS total_imoveis,
+                       COUNT(*) FILTER (WHERE ("TIPO_LANCAMENTO_LAN" = 0 OR "TIPO_LANCAMENTO_LAN" IS NULL)) AS normal,
                        COUNT(*) FILTER (WHERE ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2)) AS isentos,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS imposto_minimo,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS iptu_social,
                        COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imunes,
-                       COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = 1) AS predial,
-                       COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = 2) AS territorial,
+                       COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '1') AS predial,
+                       COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '2') AS territorial,
+                       COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '1' AND "INFO_USO_LAN" = '1') AS residencial,
+                       COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '1' AND "INFO_USO_LAN" != '1') AS nao_residencial,
                        COALESCE(SUM(CAST("VALR_VENAL_LAN" AS NUMERIC)), 0) AS valr_venal_total,
                        COALESCE(SUM(CAST("VALR_IMPOSTO_LAN" AS NUMERIC)), 0) AS valr_imposto_total
                 FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" = :ex
@@ -379,6 +384,70 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             
             iptu_social_serie.append({"exercicio": ano_h, "quantidade": h["social"], "limite_vigente": round(lim_soc_h, 2)})
 
+        # ─── Séries históricas de predial e territorial ───────────────────────────
+        predial_territorial_geral = consultar_clickhouse("""
+            SELECT exercicio,
+                   countIf(categoria != 'Territorial') AS predial,
+                   countIf(categoria = 'Territorial') AS territorial
+            FROM lancamento_iptu.historico_lancamentos_analitico
+            GROUP BY exercicio ORDER BY exercicio
+        """) or []
+
+        # Fallback via Postgres caso ClickHouse esteja vazio
+        if not predial_territorial_geral:
+            predial_territorial_geral = db.execute(text("""
+                SELECT
+                    "CODG_EXERCICIO_LAN" AS exercicio,
+                    COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '1') AS predial,
+                    COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '2') AS territorial
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
+                GROUP BY 1 ORDER BY 1
+            """)).mappings().all()
+
+        # ─── Migração de faixas histórica (CAP / trava) ───────────────────────────
+        migracao_trava = db.execute(text("""
+            WITH hist_raw AS (
+                SELECT
+                    "CODG_INSCRICAO_LAN"  AS inscricao,
+                    "CODG_EXERCICIO_LAN"  AS exercicio,
+                    COALESCE(faixa_ordem, 0) AS ordem,
+                    COALESCE("VALR_IMPOSTO_LAN", 0) AS imposto
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "CODG_EXERCICIO_LAN" BETWEEN 2021 AND 2026
+            ),
+            hist_mig_cap AS (
+                SELECT
+                    h1.exercicio,
+                    COUNT(*) FILTER (WHERE h1.ordem > h2.ordem AND h2.ordem > 0) AS subiu_faixa,
+                    COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
+                    COUNT(*) FILTER (
+                        WHERE (
+                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                        )
+                    ) AS travado_cap,
+                    COUNT(*) FILTER (
+                        WHERE NOT (
+                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                        ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
+                    ) AS abaixo_trava
+                FROM hist_raw h1
+                JOIN hist_raw h2
+                    ON h1.inscricao = h2.inscricao
+                    AND h1.exercicio = h2.exercicio + 1
+                GROUP BY h1.exercicio
+            )
+            SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava
+            FROM hist_mig_cap
+            ORDER BY exercicio
+        """)).mappings().all()
+
         return RespostaPadrao(dados={
             "exercicio_atual": ex,
             "kpis": dict(kpis),
@@ -393,7 +462,12 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 "imunes": [{"exercicio": h["exercicio"], "valor": int(h.get("imunes", 0) or 0)} for h in historico_geral],
                 "minimo": [{"exercicio": h["exercicio"], "valor": int(h.get("minimo", 0) or 0)} for h in historico_geral],
                 "normal": [{"exercicio": h["exercicio"], "valor": int(h.get("normal", 0) or 0)} for h in historico_geral]
-            }
+            },
+            "predial_territorial": [
+                {"exercicio": int(h["exercicio"]), "predial": int(h.get("predial", 0) or 0), "territorial": int(h.get("territorial", 0) or 0)}
+                for h in predial_territorial_geral
+            ],
+            "migracao_trava": [dict(r) for r in migracao_trava]
         })
     except Exception as e:
         return RespostaPadrao(dados={}, meta={"mensagem": str(e)})

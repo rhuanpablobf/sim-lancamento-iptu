@@ -7,11 +7,15 @@ import { fetcher } from "../../lib/api";
 
 interface KpisBrutos {
   total_imoveis: number;
+  normal: number;
   isentos: number;
   imposto_minimo: number;
   iptu_social: number;
+  imunes: number;
   predial: number;
   territorial: number;
+  residencial: number;
+  nao_residencial: number;
   valr_venal_total: number;
   valr_imposto_total: number;
   aliquota_media: number;
@@ -187,6 +191,57 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
   );
 };
 
+const PieChart = ({ dados, total, title }: { dados: { label: string, value: number, color: string }[], total: number, title: string }) => {
+  let currentPercent = 0;
+  
+  const getCoordinatesForPercent = (percent: number) => {
+    const x = Math.cos(2 * Math.PI * percent);
+    const y = Math.sin(2 * Math.PI * percent);
+    return [x, y];
+  };
+
+  return (
+    <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '10px', padding: '15px' }}>
+      <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{title}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px', flex: 1 }}>
+        <div style={{ width: '100px', height: '100px', flexShrink: 0 }}>
+          <svg viewBox="-1.1 -1.1 2.2 2.2" style={{ transform: 'rotate(-90deg)', width: '100%', height: '100%' }}>
+            {dados.map((slice, i) => {
+              if (slice.value <= 0) return null;
+              const percent = slice.value / total;
+              const [startX, startY] = getCoordinatesForPercent(currentPercent);
+              currentPercent += percent;
+              const [endX, endY] = getCoordinatesForPercent(currentPercent);
+              const largeArcFlag = percent > 0.5 ? 1 : 0;
+              const pathData = [
+                `M ${startX} ${startY}`,
+                `A 1 1 0 ${largeArcFlag} 1 ${endX} ${endY}`,
+                `L 0 0`,
+              ].join(' ');
+              return <path key={i} d={pathData} fill={slice.color} stroke="#fff" strokeWidth="0.02" />;
+            })}
+            <circle cx="0" cy="0" r="0.6" fill="#fff" />
+          </svg>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+          {dados.map((slice, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ width: '8px', height: '8px', borderRadius: '2px', backgroundColor: slice.color }}></div>
+                <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{slice.label}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', color: 'var(--text-muted)' }}>
+                <span>{fmtNum(slice.value)}</span>
+                <span style={{ fontWeight: 600, color: slice.color, minWidth: '40px', textAlign: 'right' }}>{fmtPct(slice.value, total)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Componente ───────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -261,6 +316,7 @@ export default function DashboardPage() {
   );
   const parametros = respParams?.dados || [];
   const simulacaoAtiva = simulacoes.find(s => s.id === contexto);
+  const paramsAtivos = parametros[0];
 
   // Calcula escala de fonte baseada no número de anos visíveis para evitar truncamento
   const calcFS = (base: number = 1) => {
@@ -453,30 +509,45 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Índices e Parâmetros (Apenas para Simulação) */}
-        {contexto !== "base" && simulacaoAtiva && respParams?.dados && respParams.dados.length > 0 && (() => {
-          const p = respParams.dados[0];
-          return (
-            <div className="mt-16 text-sm text-muted" style={{ background: "var(--surface-2)", padding: "10px 16px", borderRadius: "8px", border: "1px solid var(--border)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <span className="fw-600" style={{ color: "var(--txt-1)" }}>Índices:</span>
-              <span>IPCA: {p.ipca_ano}%</span>
-              <span>•</span>
-              <span>SELIC: {p.selic_ano}%</span>
-              <span>•</span>
-              <span>Faixa de Alíquota: {p.tipo_indice_faixa || simulacaoAtiva.cenario}</span>
-              <span>•</span>
-              <span>IPTU Social: {p.tipo_indice_social}</span>
-              <span>•</span>
-              <span>Imposto Mínimo: {p.tipo_indice_minimo}</span>
-              {simulacaoAtiva.aplicar_cap && (
-                <>
-                  <span>•</span>
-                  <span>Aplicar limite de transição (CAP): {simulacaoAtiva.tipo_cap === 'APENAS_INFLACAO' ? 'Apenas Inflação (IPCA)' : 'Inflação + 5%'}</span>
-                </>
-              )}
+        {/* Índices e Info */}
+        {contexto !== "base" && (
+          <div className="card" style={{ padding: '10px 15px', marginTop: '20px', marginBottom: '20px', backgroundColor: 'rgba(14, 79, 102, 0.02)', border: '1px solid rgba(14, 79, 102, 0.1)' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.75rem', color: '#666' }}>
+              <div><strong>Índices:</strong> IPCA: {paramsAtivos?.ipca || '—'}% &bull; SELIC: {paramsAtivos?.selic || '—'}% &bull; Faixa de Alíquota: {paramsAtivos?.cenario_faixas || '—'} &bull; IPTU Social: {paramsAtivos?.cenario_social || '—'} &bull; Imposto Mínimo: {paramsAtivos?.cenario_minimo || '—'} &bull; Aplicar limite de transição (CAP): {paramsAtivos?.aplicar_cap ? `Inflação + ${paramsAtivos.cap_percentual}%` : 'Não'}</div>
             </div>
-          );
-        })()}
+          </div>
+        )}
+
+        {/* Graficos de Pizza */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
+          <PieChart 
+            title="Tipo de Imposto"
+            total={kpis?.total_imoveis || 0}
+            dados={[
+              { label: 'Predial', value: kpis?.predial || 0, color: '#0e4f66' },
+              { label: 'Territorial', value: kpis?.territorial || 0, color: '#e67e22' }
+            ]}
+          />
+          <PieChart 
+            title="Tipo de Lançamento"
+            total={kpis?.total_imoveis || 0}
+            dados={[
+              { label: 'Normal', value: (kpis?.normal || 0), color: '#27ae60' },
+              { label: 'Social', value: kpis?.iptu_social || 0, color: '#3498db' },
+              { label: 'Isento', value: kpis?.isentos || 0, color: '#9b59b6' },
+              { label: 'Mínimo', value: kpis?.imposto_minimo || 0, color: '#f1c40f' },
+              { label: 'Imune', value: kpis?.imunes || 0, color: '#95a5a6' }
+            ]}
+          />
+          <PieChart 
+            title="Tipo de Uso"
+            total={(kpis?.residencial || 0) + (kpis?.nao_residencial || 0)}
+            dados={[
+              { label: 'Residencial', value: kpis?.residencial || 0, color: '#2ecc71' },
+              { label: 'Não Residencial', value: kpis?.nao_residencial || 0, color: '#34495e' }
+            ]}
+          />
+        </div>
 
         {/* Filtro de Período para Gráficos */}
         <div className="card mt-16" style={{ padding: "12px 20px" }}>
@@ -510,192 +581,226 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Gráficos de Evolução - Nova Hierarquia Visual */}
-        
-        {/* Linha 1: Lançamento (Destaque Total) */}
-        <div className="mt-16">
+        {/* Gráficos em Série */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '20px' }}>
+          
+          {/* Linha 1: Lançamento */}
           <div className="card">
             <div className="card-header">
-              <div className="card-title">Lançamento (Milhões R$)</div>
-              <div className="badge badge-blue">Cofre</div>
+              <h3 className="card-title">Lançamento (Milhões R$)</h3>
+              <span className="badge badge-primary">Cofre</span>
             </div>
             <div className="card-body">
               <LineChart 
-                dados={(d?.arrecadacao_historica || []).filter((h: any) => anosGraficoVisiveis.includes(h.exercicio))} 
-                valorKey="valor"
+                dados={(d?.arrecadacao_historica || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio))} 
                 moeda={true} 
-                height={80} 
+                height={110} 
                 anoAtivo={anoSelecionado}
-                fontScale={calcFS(0.5)} // Escala dinâmica
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Linha 2: Normal e IPTU Social (2 Colunas) */}
-        <div className="grid-2 mt-16">
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Normal (Qtd. Imóveis)</div>
-              <div className="badge badge-blue">Tributados</div>
-            </div>
-            <div className="card-body">
-              <LineChart 
-                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.normal }))} 
-                valorKey="valor"
-                height={100} // Ajustado
-                anoAtivo={anoSelecionado}
-                fontScale={calcFS(0.9)}
+                fontScale={calcFS(1.0)}
+                lineWidth={1.2}
               />
             </div>
           </div>
 
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">IPTU Social (Qtd. Imóveis)</div>
-              <div className="badge badge-green">Social</div>
+          {/* Linha 1b: Predial e Territorial */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Predial (Qtd. Imóveis)</h3>
+                <span className="badge badge-primary">Predial</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.predial_territorial || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.predial }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
             </div>
-            <div className="card-body">
-              <LineChart 
-                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.social }))} 
-                valorKey="valor"
-                height={100} // Ajustado
-                anoAtivo={anoSelecionado}
-                fontScale={calcFS(0.9)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Linha 3: Isentos, Imunes e Imposto Mínimo (3 Colunas) */}
-        <div className="grid-3 mt-16">
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Isentos (Qtd. Imóveis)</div>
-              <div className="badge badge-amber">Fiscal</div>
-            </div>
-            <div className="card-body">
-              <LineChart 
-                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.isentos }))} 
-                valorKey="valor"
-                height={140} // Restaurado
-                anoAtivo={anoSelecionado}
-                fontScale={calcFS(1.3)}
-                lineWidth={1.3}
-              />
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">Imunes (Qtd. Imóveis)</div>
-              <div className="badge badge-purple">Fiscal</div>
-            </div>
-            <div className="card-body">
-              <LineChart 
-                dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.imunes }))} 
-                valorKey="valor"
-                height={140} // Restaurado
-                anoAtivo={anoSelecionado}
-                fontScale={calcFS(1.3)}
-                lineWidth={1.3}
-              />
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Territorial (Qtd. Imóveis)</h3>
+                <span className="badge" style={{ background: 'rgba(230, 126, 34, 0.15)', color: '#e67e22', border: '1px solid rgba(230, 126, 34, 0.3)' }}>Territorial</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.predial_territorial || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.territorial }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
             </div>
           </div>
 
+          {/* Linha 2: Normal e Social */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Normal (Qtd. Imóveis)</h3>
+                <span className="badge badge-primary">Tributados</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.normal }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">IPTU Social (Qtd. Imóveis)</h3>
+                <span className="badge badge-success">Social</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.social }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Linha 3: Isentos e Imunes */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Isentos (Qtd. Imóveis)</h3>
+                <span className="badge badge-warning">Fiscal</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.isentos }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Imunes (Qtd. Imóveis)</h3>
+                <span className="badge badge-warning">Fiscal</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.imunes }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Linha 4: Caiu e Subiu de Faixa */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Caiu de Faixa (Qtd. Imóveis)</h3>
+                <span className="badge badge-success">Migração</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.desceu_faixa }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Subiu de Faixa (Qtd. Imóveis)</h3>
+                <span className="badge badge-warning">Migração</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.subiu_faixa }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Linha 5: CAP e Abaixo da Trava */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Travados no Limite (CAP) - Qtd. Imóveis</h3>
+                <span className="badge badge-danger">Transição</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.travado_cap }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-header">
+                <h3 className="card-title">Abaixo da Trava (Qtd. Imóveis)</h3>
+                <span className="badge badge-info">Normal</span>
+              </div>
+              <div className="card-body">
+                <LineChart 
+                  dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.abaixo_trava }))} 
+                  valorKey="valor"
+                  height={100}
+                  anoAtivo={anoSelecionado}
+                  fontScale={calcFS(1.0)}
+                  lineWidth={1.1}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Linha 6: Imposto Mínimo */}
           <div className="card">
             <div className="card-header">
-              <div className="card-title">Imposto Mínimo (Qtd. Imóveis)</div>
-              <div className="badge badge-red">Tributados</div>
+              <h3 className="card-title">Imposto Mínimo (Qtd. Imóveis)</h3>
+              <span className="badge badge-primary">Tributados</span>
             </div>
             <div className="card-body">
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.minimo }))} 
                 valorKey="valor"
-                height={140} // Restaurado
+                height={110}
                 anoAtivo={anoSelecionado}
-                fontScale={calcFS(1.3)}
-                lineWidth={1.3}
+                fontScale={calcFS(1.0)}
+                lineWidth={1.2}
               />
             </div>
           </div>
+
         </div>
-        {/* Linha 4: Migração de Faixas e Travados no CAP (Apenas Simulações) */}
-        {contexto !== "base" && (
-          <>
-            <div className="grid-3 mt-16">
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Caiu de Faixa (Qtd. Imóveis)</div>
-                  <div className="badge badge-green">Migração</div>
-                </div>
-                <div className="card-body">
-                  <LineChart 
-                    dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.desceu_faixa }))} 
-                    valorKey="valor"
-                    height={140}
-                    anoAtivo={anoSelecionado}
-                    fontScale={calcFS(1.3)}
-                    lineWidth={1.3}
-                  />
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Subiu de Faixa (Qtd. Imóveis)</div>
-                  <div className="badge badge-amber">Migração</div>
-                </div>
-                <div className="card-body">
-                  <LineChart 
-                    dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.subiu_faixa }))} 
-                    valorKey="valor"
-                    height={140}
-                    anoAtivo={anoSelecionado}
-                    fontScale={calcFS(1.3)}
-                    lineWidth={1.3}
-                  />
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Abaixo da Trava (Qtd. Imóveis)</div>
-                  <div className="badge badge-blue">Normal</div>
-                </div>
-                <div className="card-body">
-                  <LineChart 
-                    dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.abaixo_trava }))} 
-                    valorKey="valor"
-                    height={140}
-                    anoAtivo={anoSelecionado}
-                    fontScale={calcFS(1.3)}
-                    lineWidth={1.3}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-16">
-              <div className="card">
-                <div className="card-header">
-                  <div className="card-title">Travados no Limite (CAP) - Qtd. Imóveis</div>
-                  <div className="badge badge-red">Transição</div>
-                </div>
-                <div className="card-body">
-                  <LineChart 
-                    dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.na_trava }))} 
-                    valorKey="valor"
-                    height={80} 
-                    anoAtivo={anoSelecionado}
-                    fontScale={calcFS(0.5)}
-                    lineWidth={1.3}
-                  />
-                </div>
-              </div>
-            </div>
-          </>
-        )}
 
 
         {/* Distribuição por faixa — sempre visível quando há dados */}
