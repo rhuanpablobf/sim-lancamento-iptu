@@ -391,14 +391,23 @@ def dashboard_simulacao(
             "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in v_hist]
         },
         "migracao_trava": [dict(row) for row in db.execute(text("""
-            SELECT codg_exercicio_lan AS exercicio,
-                   COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int > NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS subiu_faixa,
-                   COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int < NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS desceu_faixa,
-                   COUNT(*) FILTER (WHERE valr_iptu_bruto > valr_imposto_final AND tipo_lancamento = 0) AS na_trava
-            FROM sim_lancamentos
-            WHERE simulacao_id = :sid
-            GROUP BY codg_exercicio_lan
-            ORDER BY codg_exercicio_lan
+            WITH sim AS (
+                SELECT codg_exercicio_lan AS exercicio,
+                       COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int > NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS subiu_faixa,
+                       COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int < NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS desceu_faixa,
+                       COUNT(*) FILTER (WHERE valr_iptu_bruto > valr_imposto_final AND tipo_lancamento = 0) AS na_trava,
+                       COUNT(*) FILTER (WHERE valr_iptu_bruto <= valr_imposto_final AND tipo_lancamento = 0) AS abaixo_trava
+                FROM sim_lancamentos
+                WHERE simulacao_id = :sid
+                GROUP BY codg_exercicio_lan
+            ),
+            anos AS (
+                SELECT generate_series(2022, 2026) AS exercicio
+            )
+            SELECT a.exercicio, 0 AS subiu_faixa, 0 AS desceu_faixa, 0 AS na_trava, 0 AS abaixo_trava FROM anos a
+            UNION ALL
+            SELECT s.exercicio, s.subiu_faixa, s.desceu_faixa, s.na_trava, s.abaixo_trava FROM sim s
+            ORDER BY exercicio
         """), {"sid": str(simulacao_id)}).mappings().all()]
     })
 
