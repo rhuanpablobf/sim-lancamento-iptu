@@ -262,6 +262,16 @@ export default function DashboardPage() {
   const parametros = respParams?.dados || [];
   const simulacaoAtiva = simulacoes.find(s => s.id === contexto);
 
+  // Calcula escala de fonte baseada no número de anos visíveis para evitar truncamento
+  const calcFS = (base: number = 1) => {
+    const n = anosGraficoVisiveis.length;
+    if (n <= 6) return base;
+    if (n <= 10) return base * 0.85;
+    if (n <= 15) return base * 0.65;
+    if (n <= 20) return base * 0.45;
+    return base * 0.35;
+  };
+
   // Inicializa anos do gráfico quando os dados chegam
   useEffect(() => {
     if (d?.arrecadacao_historica) {
@@ -516,7 +526,7 @@ export default function DashboardPage() {
                 moeda={true} 
                 height={80} 
                 anoAtivo={anoSelecionado}
-                fontScale={0.5} // Redução de 50% na fonte
+                fontScale={calcFS(0.5)} // Escala dinâmica
               />
             </div>
           </div>
@@ -535,6 +545,7 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={100} // Ajustado
                 anoAtivo={anoSelecionado}
+                fontScale={calcFS(0.9)}
               />
             </div>
           </div>
@@ -550,6 +561,7 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={100} // Ajustado
                 anoAtivo={anoSelecionado}
+                fontScale={calcFS(0.9)}
               />
             </div>
           </div>
@@ -568,7 +580,7 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={140} // Restaurado
                 anoAtivo={anoSelecionado}
-                fontScale={1.3}
+                fontScale={calcFS(1.3)}
                 lineWidth={1.3}
               />
             </div>
@@ -585,7 +597,7 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={140} // Restaurado
                 anoAtivo={anoSelecionado}
-                fontScale={1.3}
+                fontScale={calcFS(1.3)}
                 lineWidth={1.3}
               />
             </div>
@@ -602,7 +614,7 @@ export default function DashboardPage() {
                 valorKey="valor"
                 height={140} // Restaurado
                 anoAtivo={anoSelecionado}
-                fontScale={1.3}
+                fontScale={calcFS(1.3)}
                 lineWidth={1.3}
               />
             </div>
@@ -623,7 +635,7 @@ export default function DashboardPage() {
                     valorKey="valor"
                     height={140}
                     anoAtivo={anoSelecionado}
-                    fontScale={1.3}
+                    fontScale={calcFS(1.3)}
                     lineWidth={1.3}
                   />
                 </div>
@@ -640,7 +652,7 @@ export default function DashboardPage() {
                     valorKey="valor"
                     height={140}
                     anoAtivo={anoSelecionado}
-                    fontScale={1.3}
+                    fontScale={calcFS(1.3)}
                     lineWidth={1.3}
                   />
                 </div>
@@ -657,7 +669,7 @@ export default function DashboardPage() {
                     valorKey="valor"
                     height={140}
                     anoAtivo={anoSelecionado}
-                    fontScale={1.3}
+                    fontScale={calcFS(1.3)}
                     lineWidth={1.3}
                   />
                 </div>
@@ -676,7 +688,7 @@ export default function DashboardPage() {
                     valorKey="valor"
                     height={80} 
                     anoAtivo={anoSelecionado}
-                    fontScale={0.5}
+                    fontScale={calcFS(0.5)}
                     lineWidth={1.3}
                   />
                 </div>
