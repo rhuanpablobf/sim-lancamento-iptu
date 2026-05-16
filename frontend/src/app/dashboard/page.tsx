@@ -266,10 +266,10 @@ export default function DashboardPage() {
   const calcFS = (base: number = 1) => {
     const n = anosGraficoVisiveis.length;
     if (n <= 6) return base;
-    if (n <= 10) return base * 0.85;
-    if (n <= 15) return base * 0.65;
-    if (n <= 20) return base * 0.45;
-    return base * 0.35;
+    if (n <= 10) return base * 0.90;
+    if (n <= 15) return base * 0.80;
+    if (n <= 20) return base * 0.60;
+    return base * 0.50;
   };
 
   // Inicializa anos do gráfico quando os dados chegam
