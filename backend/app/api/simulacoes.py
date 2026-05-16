@@ -401,10 +401,41 @@ def dashboard_simulacao(
                 WHERE simulacao_id = :sid
                 GROUP BY codg_exercicio_lan
             ),
-            anos AS (
-                SELECT generate_series(2022, 2026) AS exercicio
+            hist_raw AS (
+                SELECT 
+                    "CODG_INSCRICAO_LAN" as inscricao, 
+                    "CODG_EXERCICIO_LAN" as exercicio, 
+                    COALESCE(faixa_ordem, 0) as ordem, 
+                    COALESCE("VALR_IMPOSTO_LAN", 0) as imposto
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "CODG_EXERCICIO_LAN" BETWEEN 2021 AND 2026
+            ),
+            hist_mig_cap AS (
+                SELECT 
+                    h1.exercicio,
+                    COUNT(*) FILTER (WHERE h1.ordem > h2.ordem AND h2.ordem > 0) AS subiu_faixa,
+                    COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
+                    COUNT(*) FILTER (
+                        WHERE (
+                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                        )
+                    ) AS na_trava,
+                    COUNT(*) FILTER (
+                        WHERE NOT (
+                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                        ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
+                    ) AS abaixo_trava
+                FROM hist_raw h1
+                JOIN hist_raw h2 ON h1.inscricao = h2.inscricao AND h1.exercicio = h2.exercicio + 1
+                GROUP BY h1.exercicio
             )
-            SELECT a.exercicio, 0 AS subiu_faixa, 0 AS desceu_faixa, 0 AS na_trava, 0 AS abaixo_trava FROM anos a
+            SELECT h.exercicio, h.subiu_faixa, h.desceu_faixa, h.na_trava, h.abaixo_trava FROM hist_mig_cap h
             UNION ALL
             SELECT s.exercicio, s.subiu_faixa, s.desceu_faixa, s.na_trava, s.abaixo_trava FROM sim s
             ORDER BY exercicio
