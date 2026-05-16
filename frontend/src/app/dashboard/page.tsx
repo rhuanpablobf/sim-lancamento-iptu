@@ -674,9 +674,9 @@ export default function DashboardPage() {
                   <LineChart 
                     dados={(d?.migracao_trava || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.na_trava }))} 
                     valorKey="valor"
-                    height={140}
+                    height={80} 
                     anoAtivo={anoSelecionado}
-                    fontScale={1.3}
+                    fontScale={0.5}
                     lineWidth={1.3}
                   />
                 </div>
