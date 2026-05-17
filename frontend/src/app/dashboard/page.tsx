@@ -45,6 +45,8 @@ interface SimulacaoMin {
   exercicio_base: number;
   exercicio_destino: number;
   cenario?: string;
+  indexador_social?: string;
+  indexador_minimo?: string;
   aplicar_cap?: boolean;
   tipo_cap?: string;
   descricao?: string;
@@ -314,7 +316,7 @@ export default function DashboardPage() {
   );
   const parametros = respParams?.dados || [];
   const simulacaoAtiva = simulacoes.find(s => s.id === contexto);
-  const paramsAtivos = parametros[0];
+  const paramsAtivos = parametros.find((p: any) => p.exercicio === anoSelecionado) || parametros[0];
 
   // Calcula escala de fonte baseada no número de anos visíveis para evitar truncamento
   const calcFS = (base: number = 1) => {
@@ -515,7 +517,15 @@ export default function DashboardPage() {
         {contexto !== "base" && (
           <div className="card" style={{ padding: '10px 15px', marginTop: '20px', marginBottom: '20px', backgroundColor: 'rgba(14, 79, 102, 0.02)', border: '1px solid rgba(14, 79, 102, 0.1)' }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '20px', fontSize: '0.75rem', color: '#666' }}>
-              <div><strong>Índices:</strong> IPCA: {paramsAtivos?.ipca || '—'}% &bull; SELIC: {paramsAtivos?.selic || '—'}% &bull; Faixa de Alíquota: {paramsAtivos?.cenario_faixas || '—'} &bull; IPTU Social: {paramsAtivos?.cenario_social || '—'} &bull; Imposto Mínimo: {paramsAtivos?.cenario_minimo || '—'} &bull; Aplicar limite de transição (CAP): {paramsAtivos?.aplicar_cap ? `Inflação + ${paramsAtivos.cap_percentual}%` : 'Não'}</div>
+              <div>
+                <strong>Índices:</strong>{' '}
+                IPCA: {paramsAtivos?.ipca_ano !== undefined && paramsAtivos?.ipca_ano !== null ? `${paramsAtivos.ipca_ano}%` : '—'}{' '}
+                &bull; SELIC: {paramsAtivos?.selic_ano !== undefined && paramsAtivos?.selic_ano !== null ? `${paramsAtivos.selic_ano}%` : '—'}{' '}
+                &bull; Faixa de Alíquota: {paramsAtivos?.tipo_indice_faixa || simulacaoAtiva?.cenario || '—'}{' '}
+                &bull; IPTU Social: {paramsAtivos?.tipo_indice_social || simulacaoAtiva?.indexador_social || '—'}{' '}
+                &bull; Imposto Mínimo: {paramsAtivos?.tipo_indice_minimo || simulacaoAtiva?.indexador_minimo || '—'}{' '}
+                &bull; Aplicar limite de transição (CAP): {simulacaoAtiva?.aplicar_cap ? (simulacaoAtiva.tipo_cap === 'APENAS_INFLACAO' ? 'Apenas Inflação (IPCA)' : 'Inflação + 5% (Art. 168 §6º)') : 'Não'}
+              </div>
             </div>
           </div>
         )}
