@@ -472,6 +472,8 @@ def dashboard_simulacao(
     dict_migracao = {x["exercicio"]: x for x in dados_historicos}
     for x in dados_simulados:
         dict_migracao[x["exercicio"]] = x
+    if 2022 not in dict_migracao:
+        dict_migracao[2022] = {"exercicio": 2022, "subiu_faixa": 0, "desceu_faixa": 0, "travado_cap": 0, "abaixo_trava": 0}
     dados_migracao_trava = sorted(dict_migracao.values(), key=lambda x: x["exercicio"])
 
     # ─── Séries de predial e territorial (Histórico + Simulado) ───────────────────

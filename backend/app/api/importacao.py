@@ -525,7 +525,10 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 {"exercicio": int(h["exercicio"]), "predial": int(h.get("predial", 0) or 0), "territorial": int(h.get("territorial", 0) or 0)}
                 for h in predial_territorial_geral
             ],
-            "migracao_trava": [dict(r) for r in migracao_trava_dados]
+            "migracao_trava": (
+                [{"exercicio": 2022, "subiu_faixa": 0, "desceu_faixa": 0, "travado_cap": 0, "abaixo_trava": 0}]
+                if not any(r.get("exercicio") == 2022 for r in migracao_trava_dados) else []
+            ) + [dict(r) for r in migracao_trava_dados]
         })
     except Exception as e:
         return RespostaPadrao(dados={}, meta={"mensagem": str(e)})
