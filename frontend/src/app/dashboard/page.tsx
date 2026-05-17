@@ -727,7 +727,12 @@ export default function DashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">Caiu de Faixa (Qtd. Imóveis)</h3>
+                <div>
+                  <h3 className="card-title">Caiu de Faixa (Qtd. Imóveis)</h3>
+                  <div className="card-subtitle">
+                    Imóveis que migraram para alíquotas inferiores. <strong>Queda (seta vermelha) é positiva</strong>, indicando menos imóveis com imposto reduzido.
+                  </div>
+                </div>
                 <span className="badge badge-success">Migração</span>
               </div>
               <div className="card-body">
@@ -743,7 +748,12 @@ export default function DashboardPage() {
             </div>
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">Subiu de Faixa (Qtd. Imóveis)</h3>
+                <div>
+                  <h3 className="card-title">Subiu de Faixa (Qtd. Imóveis)</h3>
+                  <div className="card-subtitle">
+                    Imóveis que migraram para alíquotas superiores. <strong>Crescimento (seta verde) é positivo</strong>, indicando maior volume de imóveis subindo de faixa.
+                  </div>
+                </div>
                 <span className="badge badge-warning">Migração</span>
               </div>
               <div className="card-body">
@@ -763,7 +773,12 @@ export default function DashboardPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">Travados no Limite (CAP) - Qtd. Imóveis</h3>
+                <div>
+                  <h3 className="card-title">Travados no Limite (CAP) - Qtd. Imóveis</h3>
+                  <div className="card-subtitle">
+                    Imóveis reprimidos pelo reajuste anual máximo em lei. <strong>Queda (seta vermelha) é excelente</strong>, pois indica menos imóveis travados na inflação.
+                  </div>
+                </div>
                 <span className="badge badge-danger">Transição</span>
               </div>
               <div className="card-body">
@@ -779,7 +794,12 @@ export default function DashboardPage() {
             </div>
             <div className="card">
               <div className="card-header">
-                <h3 className="card-title">Abaixo da Trava (Qtd. Imóveis)</h3>
+                <div>
+                  <h3 className="card-title">Abaixo da Trava (Qtd. Imóveis)</h3>
+                  <div className="card-subtitle">
+                    Imóveis que pagaram o imposto calculado sem bater no limite legal. <strong>Crescimento (seta verde) é o ideal</strong>, indicando pagamento integral sem travas.
+                  </div>
+                </div>
                 <span className="badge badge-info">Normal</span>
               </div>
               <div className="card-body">
