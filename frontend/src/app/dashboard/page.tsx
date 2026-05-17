@@ -83,15 +83,10 @@ const variacao = (atual: number, anterior?: number, exercicioRef?: number | stri
 const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, width = 600, moeda = false, anoAtivo = null, fontScale = 1, lineWidth = 1 }: any) => {
   if (!dados || dados.length === 0) return <div className="table-empty">Sem dados para o gráfico</div>;
 
-  const padding = { 
-    top: 30, 
-    right: width === 1200 ? 50 : 40, 
-    bottom: 30, 
-    left: width === 1200 ? 50 : 40 
-  };
+  const padding = { top: 30, right: 40, bottom: 30, left: 40 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const fsFactor = width === 1200 ? 1.8 : 1.0;
+  const fsFactor = 1.0;
 
   const maxVal = Math.max(...dados.map((d: any) => d[valorKey] || 0), 1) * 1.1;
   const minVal = 0;
