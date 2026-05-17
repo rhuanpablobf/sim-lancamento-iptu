@@ -447,18 +447,18 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                         COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
                         COUNT(*) FILTER (
                             WHERE (
-                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
-                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
-                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
-                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0590, 0.0589)) OR
+                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0468, 0.0467)) OR
+                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0487, 0.0486)) OR
+                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0446, 0.0447))
                             )
                         ) AS travado_cap,
                         COUNT(*) FILTER (
                             WHERE NOT (
-                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
-                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
-                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
-                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0590, 0.0589)) OR
+                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0468, 0.0467)) OR
+                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0487, 0.0486)) OR
+                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) IN (0.0446, 0.0447))
                             ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
                         ) AS abaixo_trava
                     FROM hist_raw h1
