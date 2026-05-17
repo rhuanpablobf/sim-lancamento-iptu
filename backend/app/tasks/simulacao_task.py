@@ -139,6 +139,10 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
             atualizar_progresso(mensagem=msg_ch)
             self.update_state(state='PROGRESS', meta={'progresso': 99, 'mensagem': msg_ch})
             sincronizar_simulacao_para_clickhouse(simulacao_id, db)
+            
+            # Pré-cachear métricas de migração e CAP no ClickHouse
+            from app.clickhouse import pre_cachear_simulacao_migracao_trava
+            pre_cachear_simulacao_migracao_trava(simulacao_id, db)
         except Exception as e:
             import logging
             logging.error(f"Erro ao sincronizar com ClickHouse: {e}")

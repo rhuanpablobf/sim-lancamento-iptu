@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.db import obter_sessao
 from app.models import Simulacao, SimLancamento
-from app.clickhouse import obter_cliente
+from app.clickhouse import obter_cliente, consultar_clickhouse
 from app.schemas import SimulacaoCriar, SimulacaoLer, RespostaPadrao
 from app.tasks.simulacao_task import executar_simulacao
 
@@ -124,6 +124,7 @@ def excluir_simulacao(simulacao_id: UUID, db: Session = Depends(obter_sessao)) -
         if ch_client:
             # Comando assíncrono de deleção no ClickHouse
             ch_client.command(f"ALTER TABLE sim_lancamentos_analitico DELETE WHERE simulacao_id = '{sid_str}'")
+            ch_client.command(f"ALTER TABLE cache_sim_migracao_trava DELETE WHERE simulacao_id = '{sid_str}'")
     except Exception as e_ch:
         import logging
         logging.error(f"Erro ao excluir dados no ClickHouse para {sid_str}: {e_ch}")
@@ -276,6 +277,10 @@ def dashboard_simulacao(
             countIf(tipo_lancamento = 2) AS imposto_minimo,
             countIf(tipo_lancamento = 3) AS iptu_social,
             countIf(tipo_lancamento = 4) AS imunes,
+            countIf(categoria != 'Territorial') AS predial,
+            countIf(categoria = 'Territorial') AS territorial,
+            countIf(categoria = 'Residencial') AS residencial,
+            countIf(categoria = 'Não Residencial') AS nao_residencial,
             sum(valr_venal_simulado) AS valr_venal_total,
             sum(valr_imposto) AS valr_imposto_total,
             sum(valr_imposto_anterior) AS valr_imposto_base,
@@ -289,16 +294,23 @@ def dashboard_simulacao(
     if not kpis_click or kpis_click[0]['total_imoveis'] == 0:
         kpis = db.execute(text("""
             SELECT COUNT(*) AS total_imoveis,
-                   COUNT(*) FILTER (WHERE tipo_lancamento = 1) AS isentos,
-                   COUNT(*) FILTER (WHERE tipo_lancamento = 2) AS imposto_minimo,
-                   COUNT(*) FILTER (WHERE tipo_lancamento = 3) AS iptu_social,
-                   COALESCE(SUM(valr_venal_simulado), 0)       AS valr_venal_total,
-                   COALESCE(SUM(valr_imposto_final), 0)        AS valr_imposto_total,
-                   COALESCE(SUM(valr_imposto_anterior), 0)     AS valr_imposto_base,
-                   COALESCE(SUM(valr_venal_base), 0)           AS valr_venal_base,
-                   COALESCE(AVG(valr_aliquota_simulada), 0)    AS aliquota_media
-            FROM sim_lancamentos
-            WHERE simulacao_id = :sid AND codg_exercicio_lan = :ano
+                   COUNT(*) FILTER (WHERE s.tipo_lancamento = 0) AS normal,
+                   COUNT(*) FILTER (WHERE s.tipo_lancamento = 1) AS isentos,
+                   COUNT(*) FILTER (WHERE s.tipo_lancamento = 2) AS imposto_minimo,
+                   COUNT(*) FILTER (WHERE s.tipo_lancamento = 3) AS iptu_social,
+                   COUNT(*) FILTER (WHERE s.tipo_lancamento = 4) AS imunes,
+                   COUNT(*) FILTER (WHERE b."TIPO_IMPOSTO_LAN" = '1') AS predial,
+                   COUNT(*) FILTER (WHERE b."TIPO_IMPOSTO_LAN" = '2') AS territorial,
+                   COUNT(*) FILTER (WHERE b."TIPO_IMPOSTO_LAN" = '1' AND b."INFO_USO_LAN" = '1') AS residencial,
+                   COUNT(*) FILTER (WHERE b."TIPO_IMPOSTO_LAN" = '1' AND b."INFO_USO_LAN" != '1') AS nao_residencial,
+                   COALESCE(SUM(s.valr_venal_simulado), 0)       AS valr_venal_total,
+                   COALESCE(SUM(s.valr_imposto_final), 0)        AS valr_imposto_total,
+                   COALESCE(SUM(s.valr_imposto_anterior), 0)     AS valr_imposto_base,
+                   COALESCE(SUM(s.valr_venal_base), 0)           AS valr_venal_base,
+                   COALESCE(AVG(s.valr_aliquota_simulada), 0)    AS aliquota_media
+            FROM sim_lancamentos s
+            JOIN "SIA_LANCIPTU_ASG" b ON s.isn_sia_lanciptu_asg = b."ISN_SIA_LANCIPTU_ASG"
+            WHERE s.simulacao_id = :sid AND s.codg_exercicio_lan = :ano
         """), {"sid": str(simulacao_id), "ano": exercicio}).mappings().one()
         
         categorias = [dict(row) for row in db.execute(text("""
@@ -345,6 +357,143 @@ def dashboard_simulacao(
         SimulacaoParametroUtilizado.exercicio == exercicio
     ).first()
 
+    # Otimização do tempo de carregamento da migração e travas (ClickHouse-First com Lazy Caching)
+    import logging
+    dados_historicos = consultar_clickhouse(
+        "SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM lancamento_iptu.cache_migracao_trava ORDER BY exercicio"
+    )
+    if not dados_historicos:
+        try:
+            hist_db = db.execute(text("""
+                WITH hist_raw AS (
+                    SELECT 
+                        "CODG_INSCRICAO_LAN" as inscricao, 
+                        "CODG_EXERCICIO_LAN" as exercicio, 
+                        COALESCE(faixa_ordem, 0) as ordem, 
+                        COALESCE("VALR_IMPOSTO_LAN", 0) as imposto
+                    FROM "SIA_LANCIPTU_ASG"
+                    WHERE "CODG_EXERCICIO_LAN" BETWEEN 2021 AND 2026
+                ),
+                hist_mig_cap AS (
+                    SELECT 
+                        h1.exercicio,
+                        COUNT(*) FILTER (WHERE h1.ordem > h2.ordem AND h2.ordem > 0) AS subiu_faixa,
+                        COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
+                        COUNT(*) FILTER (
+                            WHERE (
+                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                            )
+                        ) AS travado_cap,
+                        COUNT(*) FILTER (
+                            WHERE NOT (
+                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                            ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
+                        ) AS abaixo_trava
+                    FROM hist_raw h1
+                    JOIN hist_raw h2 ON h1.inscricao = h2.inscricao AND h1.exercicio = h2.exercicio + 1
+                    GROUP BY h1.exercicio
+                )
+                SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM hist_mig_cap ORDER BY exercicio
+            """)).mappings().all()
+            dados_historicos = [dict(r) for r in hist_db]
+            
+            if dados_historicos:
+                import pandas as pd
+                ch_client = obter_cliente()
+                if ch_client:
+                    df_hist = pd.DataFrame(dados_historicos)
+                    ch_client.insert_df('cache_migracao_trava', df_hist, database='lancamento_iptu')
+        except Exception as eh:
+            logging.error(f"Erro ao calcular migracao_trava historico no Postgres: {eh}")
+            dados_historicos = []
+
+    dados_simulados = consultar_clickhouse(
+        "SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM lancamento_iptu.cache_sim_migracao_trava WHERE simulacao_id = {sid:String} ORDER BY exercicio",
+        {"sid": str(simulacao_id)}
+    )
+    if not dados_simulados:
+        try:
+            logging.info(f"Fazendo fallback no Postgres para obter migração da simulação {simulacao_id}...")
+            sim_db = db.execute(text("""
+                SELECT codg_exercicio_lan AS exercicio,
+                       COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int > NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS subiu_faixa,
+                       COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int < NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS desceu_faixa,
+                       COUNT(*) FILTER (WHERE valr_iptu_bruto > valr_imposto_final AND tipo_lancamento = 0) AS travado_cap,
+                       COUNT(*) FILTER (WHERE valr_iptu_bruto <= valr_imposto_final AND tipo_lancamento = 0) AS abaixo_trava
+                FROM sim_lancamentos
+                WHERE simulacao_id = :sid
+                GROUP BY codg_exercicio_lan
+                ORDER BY codg_exercicio_lan
+            """), {"sid": str(simulacao_id)}).mappings().all()
+            dados_simulados = [dict(r) for r in sim_db]
+            
+            if dados_simulados:
+                import pandas as pd
+                ch_client = obter_cliente()
+                if ch_client:
+                    df_sim = pd.DataFrame(dados_simulados)
+                    df_sim['simulacao_id'] = str(simulacao_id)
+                    df_sim['exercicio'] = df_sim['exercicio'].astype(int)
+                    df_sim['subiu_faixa'] = df_sim['subiu_faixa'].astype(int)
+                    df_sim['desceu_faixa'] = df_sim['desceu_faixa'].astype(int)
+                    df_sim['travado_cap'] = df_sim['travado_cap'].astype(int)
+                    df_sim['abaixo_trava'] = df_sim['abaixo_trava'].astype(int)
+                    ch_client.insert_df('cache_sim_migracao_trava', df_sim, database='lancamento_iptu')
+        except Exception as es:
+            logging.error(f"Erro ao calcular migracao_trava simulado no Postgres: {es}")
+            dados_simulados = []
+
+    dados_migracao_trava = sorted(dados_historicos + dados_simulados, key=lambda x: x["exercicio"])
+
+    # ─── Séries de predial e territorial (Histórico + Simulado) ───────────────────
+    predial_territorial_geral = consultar_clickhouse("""
+        SELECT exercicio,
+               countIf(categoria != 'Territorial') AS predial,
+               countIf(categoria = 'Territorial') AS territorial
+        FROM (
+            SELECT exercicio, categoria FROM lancamento_iptu.historico_lancamentos_analitico
+            UNION ALL
+            SELECT exercicio, categoria FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
+        )
+        GROUP BY exercicio ORDER BY exercicio
+    """, {"sid": str(simulacao_id)})
+
+    if not predial_territorial_geral:
+        try:
+            # Fallback Histórico
+            hist_pt = db.execute(text("""
+                SELECT
+                    "CODG_EXERCICIO_LAN" AS exercicio,
+                    COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '1') AS predial,
+                    COUNT(*) FILTER (WHERE "TIPO_IMPOSTO_LAN" = '2') AS territorial
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
+                GROUP BY 1 ORDER BY 1
+            """)).mappings().all()
+            
+            # Fallback Simulação
+            sim_pt = db.execute(text("""
+                SELECT
+                    codg_exercicio_lan AS exercicio,
+                    COUNT(*) FILTER (WHERE tipo_imposto_lan = 1) AS predial,
+                    COUNT(*) FILTER (WHERE tipo_imposto_lan = 2) AS territorial
+                FROM sim_lancamentos
+                WHERE simulacao_id = :sid
+                GROUP BY 1 ORDER BY 1
+            """), {"sid": str(simulacao_id)}).mappings().all()
+            
+            predial_territorial_geral = [dict(r) for r in hist_pt] + [dict(r) for r in sim_pt]
+            predial_territorial_geral = sorted(predial_territorial_geral, key=lambda x: x["exercicio"])
+        except Exception as ept:
+            logging.error(f"Erro no fallback de predial_territorial: {ept}")
+            predial_territorial_geral = []
+
     return RespostaPadrao(dados={
         "exercicio_atual": exercicio,
         "exercicio_base": item.exercicio_base,
@@ -390,56 +539,11 @@ def dashboard_simulacao(
             "minimo": [{"exercicio": h["exercicio"], "valor": int(h["minimo"])} for h in v_hist],
             "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in v_hist]
         },
-        "migracao_trava": [dict(row) for row in db.execute(text("""
-            WITH sim AS (
-                SELECT codg_exercicio_lan AS exercicio,
-                       COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int > NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS subiu_faixa,
-                       COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int < NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS desceu_faixa,
-                       COUNT(*) FILTER (WHERE valr_iptu_bruto > valr_imposto_final AND tipo_lancamento = 0) AS na_trava,
-                       COUNT(*) FILTER (WHERE valr_iptu_bruto <= valr_imposto_final AND tipo_lancamento = 0) AS abaixo_trava
-                FROM sim_lancamentos
-                WHERE simulacao_id = :sid
-                GROUP BY codg_exercicio_lan
-            ),
-            hist_raw AS (
-                SELECT 
-                    "CODG_INSCRICAO_LAN" as inscricao, 
-                    "CODG_EXERCICIO_LAN" as exercicio, 
-                    COALESCE(faixa_ordem, 0) as ordem, 
-                    COALESCE("VALR_IMPOSTO_LAN", 0) as imposto
-                FROM "SIA_LANCIPTU_ASG"
-                WHERE "CODG_EXERCICIO_LAN" BETWEEN 2021 AND 2026
-            ),
-            hist_mig_cap AS (
-                SELECT 
-                    h1.exercicio,
-                    COUNT(*) FILTER (WHERE h1.ordem > h2.ordem AND h2.ordem > 0) AS subiu_faixa,
-                    COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
-                    COUNT(*) FILTER (
-                        WHERE (
-                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
-                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
-                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
-                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
-                        )
-                    ) AS na_trava,
-                    COUNT(*) FILTER (
-                        WHERE NOT (
-                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
-                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
-                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
-                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
-                        ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
-                    ) AS abaixo_trava
-                FROM hist_raw h1
-                JOIN hist_raw h2 ON h1.inscricao = h2.inscricao AND h1.exercicio = h2.exercicio + 1
-                GROUP BY h1.exercicio
-            )
-            SELECT h.exercicio, h.subiu_faixa, h.desceu_faixa, h.na_trava, h.abaixo_trava FROM hist_mig_cap h
-            UNION ALL
-            SELECT s.exercicio, s.subiu_faixa, s.desceu_faixa, s.na_trava, s.abaixo_trava FROM sim s
-            ORDER BY exercicio
-        """), {"sid": str(simulacao_id)}).mappings().all()]
+        "predial_territorial": [
+            {"exercicio": int(h["exercicio"]), "predial": int(h.get("predial", 0) or 0), "territorial": int(h.get("territorial", 0) or 0)}
+            for h in predial_territorial_geral
+        ],
+        "migracao_trava": dados_migracao_trava
     })
 
 

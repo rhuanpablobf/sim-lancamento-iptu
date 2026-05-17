@@ -80,13 +80,18 @@ const variacao = (atual: number, anterior?: number, exercicioRef?: number | stri
   };
 };
 
-const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, moeda = false, anoAtivo = null, fontScale = 1, lineWidth = 1 }: any) => {
+const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height = 200, width = 600, moeda = false, anoAtivo = null, fontScale = 1, lineWidth = 1 }: any) => {
   if (!dados || dados.length === 0) return <div className="table-empty">Sem dados para o gráfico</div>;
 
-  const padding = { top: 30, right: 40, bottom: 30, left: 40 };
-  const width = 600; // ViewBox width
+  const padding = { 
+    top: 30, 
+    right: width === 1200 ? 50 : 40, 
+    bottom: 30, 
+    left: width === 1200 ? 50 : 40 
+  };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
+  const fsFactor = width === 1200 ? 1.8 : 1.0;
 
   const maxVal = Math.max(...dados.map((d: any) => d[valorKey] || 0), 1) * 1.1;
   const minVal = 0;
@@ -153,9 +158,9 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               {variacao !== null && (
                 <text 
                   x={p.x} 
-                  y={p.y - (28 * fontScale)} 
+                  y={p.y - (28 * fontScale * fsFactor)} 
                   textAnchor="middle" 
-                  fontSize={10 * fontScale} 
+                  fontSize={10 * fontScale * fsFactor} 
                   fontWeight="700" 
                   fill={variacao > 0 ? "var(--green)" : variacao < 0 ? "var(--red)" : "var(--txt-4)"}
                 >
@@ -164,9 +169,9 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               )}
               <text 
                 x={p.x} 
-                y={p.y - (12 * fontScale)} 
+                y={p.y - (12 * fontScale * fsFactor)} 
                 textAnchor="middle" 
-                fontSize={11 * fontScale} 
+                fontSize={11 * fontScale * fsFactor} 
                 fontWeight="600" 
                 fill="var(--txt-1)"
                 style={{ opacity: 0.9 }}
@@ -175,9 +180,9 @@ const LineChart = ({ dados, valorKey = "valor", labelKey = "exercicio", height =
               </text>
               <text 
                 x={p.x} 
-                y={height - (10 * fontScale)} 
+                y={height - (10 * fontScale * fsFactor)} 
                 textAnchor="middle" 
-                fontSize={11 * fontScale} 
+                fontSize={11 * fontScale * fsFactor} 
                 fontWeight={isAtivo ? "700" : "400"} 
                 fill={isAtivo ? "var(--txt-1)" : "var(--txt-4)"}
               >
@@ -268,8 +273,6 @@ export default function DashboardPage() {
       if (!anoSelecionado || !lista.includes(anoSelecionado)) {
         setAnoSelecionado(maiorAno);
       }
-    } else {
-      setAnoSelecionado(null);
     }
   }, [anosBase, anosSimulacao, contexto]);
 
@@ -332,9 +335,13 @@ export default function DashboardPage() {
   useEffect(() => {
     if (d?.arrecadacao_historica) {
       const todos = d.arrecadacao_historica.map((h: any) => h.exercicio).sort();
-      if (anosGraficoVisiveis.length === 0 && todos.length > 0) {
-        // Por padrão, mostra os últimos 6 anos para manter o gráfico legível
+      const intersecao = anosGraficoVisiveis.filter(a => todos.includes(a));
+      if (intersecao.length === 0 && todos.length > 0) {
+        // Se os anos selecionados anteriormente não existem na nova base, reseta para os últimos 6
         setAnosGraficoVisiveis(todos.slice(-6));
+      } else if (intersecao.length > 0 && intersecao.length !== anosGraficoVisiveis.length) {
+        // Ajusta mantendo apenas os anos que de fato existem
+        setAnosGraficoVisiveis(intersecao);
       }
     }
   }, [d]);
@@ -594,6 +601,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.arrecadacao_historica || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio))} 
                 moeda={true} 
+                width={1200}
                 height={110} 
                 anoAtivo={anoSelecionado}
                 fontScale={calcFS(1.0)}
@@ -792,6 +800,7 @@ export default function DashboardPage() {
               <LineChart 
                 dados={(d?.volume_historico || []).filter((v: any) => anosGraficoVisiveis.includes(v.exercicio)).map((v: any) => ({ ...v, valor: v.minimo }))} 
                 valorKey="valor"
+                width={1200}
                 height={110}
                 anoAtivo={anoSelecionado}
                 fontScale={calcFS(1.0)}

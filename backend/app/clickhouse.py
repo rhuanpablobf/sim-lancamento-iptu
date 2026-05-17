@@ -79,6 +79,31 @@ def inicializar_clickhouse():
         ORDER BY (exercicio, categoria, faixa_codigo)
     """)
     
+    # Tabela de cache para migração da trava (CAP)
+    client.command("""
+        CREATE TABLE IF NOT EXISTS lancamento_iptu.cache_migracao_trava (
+            exercicio UInt16,
+            subiu_faixa UInt64,
+            desceu_faixa UInt64,
+            travado_cap UInt64,
+            abaixo_trava UInt64
+        ) ENGINE = MergeTree()
+        ORDER BY exercicio
+    """)
+    
+    # Tabela de cache para migração da trava de simulações (CAP)
+    client.command("""
+        CREATE TABLE IF NOT EXISTS lancamento_iptu.cache_sim_migracao_trava (
+            simulacao_id String,
+            exercicio UInt16,
+            subiu_faixa UInt64,
+            desceu_faixa UInt64,
+            travado_cap UInt64,
+            abaixo_trava UInt64
+        ) ENGINE = MergeTree()
+        ORDER BY (simulacao_id, exercicio)
+    """)
+    
     logging.info("Schema do ClickHouse pronto.")
 
 def sincronizar_historico_para_clickhouse(db_session):
@@ -148,6 +173,7 @@ def sincronizar_historico_para_clickhouse(db_session):
     try:
         # Limpa dados antigos
         client.command("TRUNCATE TABLE lancamento_iptu.historico_lancamentos_analitico")
+        client.command("TRUNCATE TABLE lancamento_iptu.cache_migracao_trava")
         
         # Executa com streaming para não estourar a RAM
         # Precisamos de uma conexão direta para stream_results
@@ -295,3 +321,46 @@ def sincronizar_todas_simulacoes_para_clickhouse(db_session):
         logging.info("Sincronização em massa de simulações concluída.")
     except Exception as e:
         logging.error(f"Erro na sincronização em massa: {e}")
+
+def pre_cachear_simulacao_migracao_trava(simulacao_id, db_session):
+    """Calcula a migração e travas da simulação no Postgres e salva no cache do ClickHouse."""
+    from sqlalchemy import text
+    import pandas as pd
+    
+    client = obter_cliente()
+    if not client:
+        return
+    try:
+        logging.info(f"Gerando cache de migracao_trava para a simulação {simulacao_id}...")
+        
+        # Limpa cache antigo se existir
+        try:
+            client.command(f"ALTER TABLE lancamento_iptu.cache_sim_migracao_trava DELETE WHERE simulacao_id = '{simulacao_id}'")
+        except Exception as ec:
+            pass
+        
+        # Calcula a agregação da simulação no Postgres
+        dados_sim = db_session.execute(text("""
+            SELECT codg_exercicio_lan AS exercicio,
+                   COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int > NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS subiu_faixa,
+                   COUNT(*) FILTER (WHERE NULLIF(REGEXP_REPLACE(faixa_atual, '[^0-9]', '', 'g'), '')::int < NULLIF(REGEXP_REPLACE(faixa_anterior, '[^0-9]', '', 'g'), '')::int) AS desceu_faixa,
+                   COUNT(*) FILTER (WHERE valr_iptu_bruto > valr_imposto_final AND tipo_lancamento = 0) AS travado_cap,
+                   COUNT(*) FILTER (WHERE valr_iptu_bruto <= valr_imposto_final AND tipo_lancamento = 0) AS abaixo_trava
+            FROM sim_lancamentos
+            WHERE simulacao_id = :sid
+            GROUP BY codg_exercicio_lan
+        """), {"sid": str(simulacao_id)}).mappings().all()
+        
+        if dados_sim:
+            df = pd.DataFrame([dict(r) for r in dados_sim])
+            df['simulacao_id'] = str(simulacao_id)
+            df['exercicio'] = df['exercicio'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+            df['subiu_faixa'] = df['subiu_faixa'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+            df['desceu_faixa'] = df['desceu_faixa'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+            df['travado_cap'] = df['travado_cap'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+            df['abaixo_trava'] = df['abaixo_trava'].apply(lambda x: int(float(x)) if pd.notnull(x) else 0)
+            
+            client.insert_df('cache_sim_migracao_trava', df, database='lancamento_iptu')
+            logging.info(f"Pre-cache de migracao_trava concluído para simulação {simulacao_id}.")
+    except Exception as e:
+        logging.error(f"Erro ao pre-cachear migracao_trava para simulação {simulacao_id}: {e}")

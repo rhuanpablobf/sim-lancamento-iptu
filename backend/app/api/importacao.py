@@ -237,6 +237,15 @@ def status_importacao(db: Session = Depends(obter_sessao)):
 def dashboard_anos(db: Session = Depends(obter_sessao)):
     """Retorna todos os exercícios distintos presentes na tabela de lançamentos."""
     try:
+        from app.clickhouse import consultar_clickhouse
+        # Tenta buscar do ClickHouse primeiro (Muito mais rápido)
+        dados_click = consultar_clickhouse('SELECT DISTINCT exercicio AS ano FROM lancamento_iptu.historico_lancamentos_analitico ORDER BY 1 DESC')
+        if dados_click:
+            return RespostaPadrao(dados=[int(r["ano"]) for r in dados_click])
+    except Exception as e:
+        pass
+
+    try:
         # Busca anos reais da tabela SIA_LANCIPTU_ASG
         resultado = db.execute(text('SELECT DISTINCT CAST("CODG_EXERCICIO_LAN" AS INTEGER) AS ano FROM "SIA_LANCIPTU_ASG" WHERE "CODG_EXERCICIO_LAN" IS NOT NULL ORDER BY 1 DESC')).mappings().all()
         return RespostaPadrao(dados=[r["ano"] for r in resultado])
@@ -254,10 +263,18 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             except: pass
 
         if not ex_val:
-            row_exercicio = db.execute(text('SELECT MAX(CAST("CODG_EXERCICIO_LAN" AS INTEGER)) AS max_ex FROM "SIA_LANCIPTU_ASG"')).mappings().one_or_none()
-            if not row_exercicio or not row_exercicio["max_ex"]:
-                return RespostaPadrao(dados={}, meta={"mensagem": "Sem dados."})
-            ex = row_exercicio["max_ex"]
+            try:
+                # Tenta buscar o ano máximo do ClickHouse primeiro (Muito mais rápido)
+                max_click = consultar_clickhouse('SELECT MAX(exercicio) AS max_ex FROM lancamento_iptu.historico_lancamentos_analitico')
+                if max_click and max_click[0]['max_ex']:
+                    ex = int(max_click[0]['max_ex'])
+                else:
+                    raise Exception("Clickhouse sem dados.")
+            except:
+                row_exercicio = db.execute(text('SELECT MAX(CAST("CODG_EXERCICIO_LAN" AS INTEGER)) AS max_ex FROM "SIA_LANCIPTU_ASG"')).mappings().one_or_none()
+                if not row_exercicio or not row_exercicio["max_ex"]:
+                    return RespostaPadrao(dados={}, meta={"mensagem": "Sem dados."})
+                ex = row_exercicio["max_ex"]
         else:
             ex = ex_val
 
@@ -406,47 +423,73 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
             """)).mappings().all()
 
         # ─── Migração de faixas histórica (CAP / trava) ───────────────────────────
-        migracao_trava = db.execute(text("""
-            WITH hist_raw AS (
-                SELECT
-                    "CODG_INSCRICAO_LAN"  AS inscricao,
-                    "CODG_EXERCICIO_LAN"  AS exercicio,
-                    COALESCE(faixa_ordem, 0) AS ordem,
-                    COALESCE("VALR_IMPOSTO_LAN", 0) AS imposto
-                FROM "SIA_LANCIPTU_ASG"
-                WHERE "CODG_EXERCICIO_LAN" BETWEEN 2021 AND 2026
-            ),
-            hist_mig_cap AS (
-                SELECT
-                    h1.exercicio,
-                    COUNT(*) FILTER (WHERE h1.ordem > h2.ordem AND h2.ordem > 0) AS subiu_faixa,
-                    COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
-                    COUNT(*) FILTER (
-                        WHERE (
-                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
-                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
-                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
-                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
-                        )
-                    ) AS travado_cap,
-                    COUNT(*) FILTER (
-                        WHERE NOT (
-                            (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
-                            (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
-                            (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
-                            (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
-                        ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
-                    ) AS abaixo_trava
-                FROM hist_raw h1
-                JOIN hist_raw h2
-                    ON h1.inscricao = h2.inscricao
-                    AND h1.exercicio = h2.exercicio + 1
-                GROUP BY h1.exercicio
-            )
-            SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava
-            FROM hist_mig_cap
-            ORDER BY exercicio
-        """)).mappings().all()
+        migracao_trava_dados = []
+        try:
+            migracao_trava_dados = consultar_clickhouse("SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM lancamento_iptu.cache_migracao_trava ORDER BY exercicio")
+        except Exception as e:
+            pass
+
+        if not migracao_trava_dados:
+            migracao_trava = db.execute(text("""
+                WITH hist_raw AS (
+                    SELECT
+                        "CODG_INSCRICAO_LAN"  AS inscricao,
+                        "CODG_EXERCICIO_LAN"  AS exercicio,
+                        COALESCE(faixa_ordem, 0) AS ordem,
+                        COALESCE("VALR_IMPOSTO_LAN", 0) AS imposto
+                    FROM "SIA_LANCIPTU_ASG"
+                    WHERE "CODG_EXERCICIO_LAN" BETWEEN 2021 AND 2026
+                ),
+                hist_mig_cap AS (
+                    SELECT
+                        h1.exercicio,
+                        COUNT(*) FILTER (WHERE h1.ordem > h2.ordem AND h2.ordem > 0) AS subiu_faixa,
+                        COUNT(*) FILTER (WHERE h1.ordem < h2.ordem AND h1.ordem > 0) AS desceu_faixa,
+                        COUNT(*) FILTER (
+                            WHERE (
+                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                            )
+                        ) AS travado_cap,
+                        COUNT(*) FILTER (
+                            WHERE NOT (
+                                (h1.exercicio = 2023 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0647) OR
+                                (h1.exercicio = 2024 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0468) OR
+                                (h1.exercicio = 2025 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0487) OR
+                                (h1.exercicio = 2026 AND round((h1.imposto / NULLIF(h2.imposto, 0) - 1)::numeric, 4) = 0.0446)
+                            ) AND h1.imposto > 0 AND h1.exercicio BETWEEN 2022 AND 2026
+                        ) AS abaixo_trava
+                    FROM hist_raw h1
+                    JOIN hist_raw h2
+                        ON h1.inscricao = h2.inscricao
+                        AND h1.exercicio = h2.exercicio + 1
+                    GROUP BY h1.exercicio
+                )
+                SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava
+                FROM hist_mig_cap
+                ORDER BY exercicio
+            """)).mappings().all()
+            
+            migracao_trava_dados = [dict(r) for r in migracao_trava]
+            
+            # Salva no cache do ClickHouse para as próximas consultas
+            try:
+                from app.clickhouse import obter_cliente
+                import pandas as pd
+                client = obter_cliente()
+                if client and migracao_trava_dados:
+                    df_cache = pd.DataFrame(migracao_trava_dados)
+                    df_cache['exercicio'] = df_cache['exercicio'].astype(int)
+                    df_cache['subiu_faixa'] = df_cache['subiu_faixa'].astype(int)
+                    df_cache['desceu_faixa'] = df_cache['desceu_faixa'].astype(int)
+                    df_cache['travado_cap'] = df_cache['travado_cap'].astype(int)
+                    df_cache['abaixo_trava'] = df_cache['abaixo_trava'].astype(int)
+                    client.insert_df('cache_migracao_trava', df_cache, database='lancamento_iptu')
+            except Exception as e:
+                import logging
+                logging.error(f"Erro ao salvar cache de migracao_trava no ClickHouse: {e}")
 
         return RespostaPadrao(dados={
             "exercicio_atual": ex,
@@ -467,7 +510,7 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 {"exercicio": int(h["exercicio"]), "predial": int(h.get("predial", 0) or 0), "territorial": int(h.get("territorial", 0) or 0)}
                 for h in predial_territorial_geral
             ],
-            "migracao_trava": [dict(r) for r in migracao_trava]
+            "migracao_trava": [dict(r) for r in migracao_trava_dados]
         })
     except Exception as e:
         return RespostaPadrao(dados={}, meta={"mensagem": str(e)})
@@ -555,20 +598,39 @@ def consolidado_faixas_base(db: Session = Depends(obter_sessao)) -> RespostaPadr
     Retorna uma visão matricial (Categoria > Faixa > Ano) contendo a contagem de imóveis.
     Versão para a base real (sem simulação).
     """
-    # 1. Dados Históricos (Reais)
-    historico = db.execute(text("""
-        SELECT 
-            CASE WHEN "TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
-                 WHEN "INFO_USO_LAN" = '1' THEN 'Residencial'
-                 ELSE 'Não Residencial' END AS categoria,
-            COALESCE(faixa_codigo, 'NI') as faixa_codigo,
-            COALESCE(faixa_label, 'Não Identificada') as faixa_label,
-            CAST("CODG_EXERCICIO_LAN" AS INTEGER) AS ano,
-            COUNT(*) AS total
-        FROM "SIA_LANCIPTU_ASG"
-        GROUP BY 1, 2, 3, 4
-        ORDER BY 1, 2, 4
-    """)).mappings().all()
+    from app.clickhouse import consultar_clickhouse
+    historico = []
+    try:
+        # Tenta buscar do ClickHouse primeiro (Muito mais rápido, ~50ms)
+        historico = consultar_clickhouse("""
+            SELECT 
+                categoria,
+                faixa_codigo,
+                faixa_label,
+                exercicio AS ano,
+                count() AS total
+            FROM lancamento_iptu.historico_lancamentos_analitico
+            GROUP BY categoria, faixa_codigo, faixa_label, exercicio
+            ORDER BY categoria, faixa_codigo, exercicio
+        """)
+    except Exception as e:
+        pass
+
+    if not historico:
+        # 1. Dados Históricos (Reais) - Fallback para Postgres caso ClickHouse falhe ou esteja vazio
+        historico = db.execute(text("""
+            SELECT 
+                CASE WHEN "TIPO_IMPOSTO_LAN" = '2' THEN 'Territorial'
+                     WHEN "INFO_USO_LAN" = '1' THEN 'Residencial'
+                     ELSE 'Não Residencial' END AS categoria,
+                COALESCE(faixa_codigo, 'NI') as faixa_codigo,
+                COALESCE(faixa_label, 'Não Identificada') as faixa_label,
+                CAST("CODG_EXERCICIO_LAN" AS INTEGER) AS ano,
+                COUNT(*) AS total
+            FROM "SIA_LANCIPTU_ASG"
+            GROUP BY 1, 2, 3, 4
+            ORDER BY 1, 2, 4
+        """)).mappings().all()
 
     # Organizar em estrutura de árvore para o frontend
     resultado = {}
@@ -607,46 +669,64 @@ def distribuicao_edificacao_base(exercicio: str = Query(None), db: Session = Dep
                 return RespostaPadrao(dados={}, meta={"mensagem": "Sem dados."})
             ex_val = row_exercicio["max_ex"]
 
-        query = text("""
-            WITH tipos AS (
+        from app.clickhouse import consultar_clickhouse
+        resultados = []
+        try:
+            # Tenta buscar do ClickHouse primeiro (Muito mais rápido, ~30ms)
+            resultados = consultar_clickhouse("""
                 SELECT 
-                    "ISN_SIA_LANCIPTU_ASG",
-                    STRING_AGG(
-                        CASE "INFO_TIPO_EDF_LAN"
-                            WHEN 1 THEN 'Casa'
-                            WHEN 2 THEN 'Apartamento'
-                            WHEN 3 THEN 'Barracão'
-                            WHEN 4 THEN 'Loja'
-                            WHEN 5 THEN 'Sala/Escritório'
-                            WHEN 6 THEN 'Galpão Comum'
-                            WHEN 7 THEN 'Galpão Industrial'
-                            WHEN 8 THEN 'Telheiro'
-                            WHEN 9 THEN 'Edificacao em Altura'
-                            WHEN 10 THEN 'Especial'
-                            WHEN 11 THEN 'Garagem'
-                            WHEN 12 THEN 'Condomínio'
-                            WHEN 13 THEN 'Escaninho'
-                            WHEN 14 THEN 'Sobrado'
-                            ELSE 'Não Mapeado'
-                        END,
-                        ' / '
-                        ORDER BY cnxarraycolumn
-                    ) AS tipo_edificacao
-                FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
-                GROUP BY 1
-            )
-            SELECT 
-                COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
-                "TIPO_LANCAMENTO_LAN" AS tipo_lancamento,
-                COUNT(*) AS quantidade
-            FROM "SIA_LANCIPTU_ASG" s
-            LEFT JOIN tipos t ON s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG"
-            WHERE s."CODG_EXERCICIO_LAN" = :ex
-            GROUP BY 1, 2
-            ORDER BY 1, 2
-        """)
-        
-        resultados = db.execute(query, {"ex": str(ex_val)}).mappings().all()
+                    tipo_edificacao,
+                    tipo_lancamento,
+                    count() AS quantidade
+                FROM lancamento_iptu.historico_lancamentos_analitico
+                WHERE exercicio = {ex:UInt16}
+                GROUP BY tipo_edificacao, tipo_lancamento
+                ORDER BY tipo_edificacao, tipo_lancamento
+            """, {"ex": int(ex_val)})
+        except Exception as e:
+            pass
+
+        if not resultados:
+            # Fallback para o Postgres caso falhe ou esteja vazio no ClickHouse
+            query = text("""
+                WITH tipos AS (
+                    SELECT 
+                        "ISN_SIA_LANCIPTU_ASG",
+                        STRING_AGG(
+                            CASE "INFO_TIPO_EDF_LAN"
+                                WHEN 1 THEN 'Casa'
+                                WHEN 2 THEN 'Apartamento'
+                                WHEN 3 THEN 'Barracão'
+                                WHEN 4 THEN 'Loja'
+                                WHEN 5 THEN 'Sala/Escritório'
+                                WHEN 6 THEN 'Galpão Comum'
+                                WHEN 7 THEN 'Galpão Industrial'
+                                WHEN 8 THEN 'Telheiro'
+                                WHEN 9 THEN 'Edificacao em Altura'
+                                WHEN 10 THEN 'Especial'
+                                WHEN 11 THEN 'Garagem'
+                                WHEN 12 THEN 'Condomínio'
+                                WHEN 13 THEN 'Escaninho'
+                                WHEN 14 THEN 'Sobrado'
+                                ELSE 'Não Mapeado'
+                            END,
+                            ' / '
+                            ORDER BY cnxarraycolumn
+                        ) AS tipo_edificacao
+                    FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
+                    GROUP BY 1
+                )
+                SELECT 
+                    COALESCE(t.tipo_edificacao, 'Territorial') AS tipo_edificacao,
+                    "TIPO_LANCAMENTO_LAN" AS tipo_lancamento,
+                    COUNT(*) AS quantidade
+                FROM "SIA_LANCIPTU_ASG" s
+                LEFT JOIN tipos t ON s."ISN_SIA_LANCIPTU_ASG" = t."ISN_SIA_LANCIPTU_ASG"
+                WHERE s."CODG_EXERCICIO_LAN" = :ex
+                GROUP BY 1, 2
+                ORDER BY 1, 2
+            """)
+            resultados = db.execute(query, {"ex": str(ex_val)}).mappings().all()
         
         # Estruturar para o frontend: { "Casa": { "Normal": 100, "Minimo": 10, ... } }
         matriz = {}
