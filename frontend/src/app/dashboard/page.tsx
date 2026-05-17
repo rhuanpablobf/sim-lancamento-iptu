@@ -567,7 +567,7 @@ export default function DashboardPage() {
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <span className="text-sm fw-700" style={{ color: "var(--txt-1)" }}>Período dos Gráficos:</span>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-                {todosAnosGrafico.map(ano => (
+                {todosAnosGrafico.map((ano: number) => (
                   <button 
                     key={ano} 
                     className="btn btn-sm"

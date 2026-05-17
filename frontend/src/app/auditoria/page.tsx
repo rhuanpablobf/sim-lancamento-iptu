@@ -115,7 +115,7 @@ export default function AuditoriaPage() {
 
           <div style={{ flex: 1 }}>
             {resultados.length === 0 ? (
-              <div style={{ height: "400px", display: "flex", flexDirection: "column", alignItems: "center", justifyCenter: "center", border: "2px dashed var(--border)", borderRadius: "var(--radius)", textAlign: "center", padding: "40px", display: "flex", justifyContent: "center" }}>
+              <div style={{ height: "400px", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", border: "2px dashed var(--border)", borderRadius: "var(--radius)", textAlign: "center", padding: "40px" }}>
                 <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
                 <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>Aguardando Consulta</div>
                 <div style={{ fontSize: "13px", color: "var(--text-muted)", maxWidth: "300px" }}>Insira uma inscrição e selecione os estudos ao lado para visualizar a evolução do imposto.</div>

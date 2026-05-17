@@ -156,11 +156,10 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
                         <div key={ano} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", opacity: conc || atual ? 1 : 0.4 }}>
                           <div style={{ 
                             width: "32px", height: "32px", borderRadius: "50%", border: "2px solid var(--border)",
-                            display: "flex", alignItems: "center", justifyCenter: "center", fontSize: "11px", fontWeight: 700,
+                            display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: 700,
                             background: conc ? "var(--green)" : "none",
                             borderColor: conc ? "var(--green)" : atual ? "var(--blue-mid)" : "var(--border)",
                             color: conc ? "white" : atual ? "var(--blue-txt)" : "inherit",
-                            display: "flex", justifyContent: "center"
                           }}>{conc ? '✓' : ano.toString().slice(-2)}</div>
                           <div style={{ textAlign: "center" }}>
                             <div style={{ fontSize: "12px", fontWeight: 700 }}>{ano}</div>

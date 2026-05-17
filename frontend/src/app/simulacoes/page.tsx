@@ -16,6 +16,7 @@ interface Simulacao {
   status: string;
   criado_em?: string;
   erro_mensagem?: string;
+  mensagem_status?: string;
 }
 
 const BADGE_STATUS: Record<string, { classe: string; dot: string; label: string }> = {
