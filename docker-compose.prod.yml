@@ -18,7 +18,7 @@ services:
     container_name: iptu_backend
     restart: always
     environment:
-      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@postgres_db:5432/lancamento-iptu
+      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@postgres_db:5432/lancamento_iptu
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
@@ -50,7 +50,7 @@ services:
     restart: always
     command: celery -A app.celery_app worker --loglevel=info --concurrency=2
     environment:
-      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@postgres_db:5432/lancamento-iptu
+      - DATABASE_URL=postgresql://rhuanpablobf%40gmail.com:15Rhu%40np%40blo@postgres_db:5432/lancamento_iptu
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
