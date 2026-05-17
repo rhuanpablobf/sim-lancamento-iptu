@@ -425,7 +425,17 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
         # ─── Migração de faixas histórica (CAP / trava) ───────────────────────────
         migracao_trava_dados = []
         try:
-            migracao_trava_dados = consultar_clickhouse("SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM lancamento_iptu.cache_migracao_trava ORDER BY exercicio")
+            migracao_trava_dados = consultar_clickhouse("""
+                SELECT 
+                    exercicio, 
+                    toInt64(max(subiu_faixa)) AS subiu_faixa, 
+                    toInt64(max(desceu_faixa)) AS desceu_faixa, 
+                    toInt64(max(travado_cap)) AS travado_cap, 
+                    toInt64(max(abaixo_trava)) AS abaixo_trava 
+                FROM lancamento_iptu.cache_migracao_trava 
+                GROUP BY exercicio 
+                ORDER BY exercicio
+            """)
         except Exception as e:
             pass
 
@@ -486,6 +496,11 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                     df_cache['desceu_faixa'] = df_cache['desceu_faixa'].astype(int)
                     df_cache['travado_cap'] = df_cache['travado_cap'].astype(int)
                     df_cache['abaixo_trava'] = df_cache['abaixo_trava'].astype(int)
+                    
+                    try:
+                        client.command("TRUNCATE TABLE lancamento_iptu.cache_migracao_trava")
+                    except Exception:
+                        pass
                     client.insert_df('cache_migracao_trava', df_cache, database='lancamento_iptu')
             except Exception as e:
                 import logging

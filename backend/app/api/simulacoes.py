@@ -359,9 +359,17 @@ def dashboard_simulacao(
 
     # Otimização do tempo de carregamento da migração e travas (ClickHouse-First com Lazy Caching)
     import logging
-    dados_historicos = consultar_clickhouse(
-        "SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM lancamento_iptu.cache_migracao_trava ORDER BY exercicio"
-    )
+    dados_historicos = consultar_clickhouse("""
+        SELECT 
+            exercicio, 
+            toInt64(max(subiu_faixa)) AS subiu_faixa, 
+            toInt64(max(desceu_faixa)) AS desceu_faixa, 
+            toInt64(max(travado_cap)) AS travado_cap, 
+            toInt64(max(abaixo_trava)) AS abaixo_trava 
+        FROM lancamento_iptu.cache_migracao_trava 
+        GROUP BY exercicio 
+        ORDER BY exercicio
+    """)
     if not dados_historicos:
         try:
             hist_db = db.execute(text("""
@@ -408,15 +416,27 @@ def dashboard_simulacao(
                 ch_client = obter_cliente()
                 if ch_client:
                     df_hist = pd.DataFrame(dados_historicos)
+                    try:
+                        ch_client.command("TRUNCATE TABLE lancamento_iptu.cache_migracao_trava")
+                    except Exception:
+                        pass
                     ch_client.insert_df('cache_migracao_trava', df_hist, database='lancamento_iptu')
         except Exception as eh:
             logging.error(f"Erro ao calcular migracao_trava historico no Postgres: {eh}")
             dados_historicos = []
 
-    dados_simulados = consultar_clickhouse(
-        "SELECT exercicio, subiu_faixa, desceu_faixa, travado_cap, abaixo_trava FROM lancamento_iptu.cache_sim_migracao_trava WHERE simulacao_id = {sid:String} ORDER BY exercicio",
-        {"sid": str(simulacao_id)}
-    )
+    dados_simulados = consultar_clickhouse("""
+        SELECT 
+            exercicio, 
+            toInt64(max(subiu_faixa)) AS subiu_faixa, 
+            toInt64(max(desceu_faixa)) AS desceu_faixa, 
+            toInt64(max(travado_cap)) AS travado_cap, 
+            toInt64(max(abaixo_trava)) AS abaixo_trava 
+        FROM lancamento_iptu.cache_sim_migracao_trava 
+        WHERE simulacao_id = {sid:String} 
+        GROUP BY exercicio 
+        ORDER BY exercicio
+    """, {"sid": str(simulacao_id)})
     if not dados_simulados:
         try:
             logging.info(f"Fazendo fallback no Postgres para obter migração da simulação {simulacao_id}...")
@@ -449,7 +469,10 @@ def dashboard_simulacao(
             logging.error(f"Erro ao calcular migracao_trava simulado no Postgres: {es}")
             dados_simulados = []
 
-    dados_migracao_trava = sorted(dados_historicos + dados_simulados, key=lambda x: x["exercicio"])
+    dict_migracao = {x["exercicio"]: x for x in dados_historicos}
+    for x in dados_simulados:
+        dict_migracao[x["exercicio"]] = x
+    dados_migracao_trava = sorted(dict_migracao.values(), key=lambda x: x["exercicio"])
 
     # ─── Séries de predial e territorial (Histórico + Simulado) ───────────────────
     predial_territorial_geral = consultar_clickhouse("""
