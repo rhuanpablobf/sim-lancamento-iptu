@@ -505,11 +505,12 @@ def dashboard_simulacao(
             # Fallback Simulação
             sim_pt = db.execute(text("""
                 SELECT
-                    codg_exercicio_lan AS exercicio,
-                    COUNT(*) FILTER (WHERE tipo_imposto_lan = 1) AS predial,
-                    COUNT(*) FILTER (WHERE tipo_imposto_lan = 2) AS territorial
-                FROM sim_lancamentos
-                WHERE simulacao_id = :sid
+                    sl.codg_exercicio_lan AS exercicio,
+                    COUNT(*) FILTER (WHERE i."TIPO_IMPOSTO_LAN" = '1') AS predial,
+                    COUNT(*) FILTER (WHERE i."TIPO_IMPOSTO_LAN" = '2') AS territorial
+                FROM sim_lancamentos sl
+                JOIN "SIA_LANCIPTU_ASG" i ON sl.isn_sia_lanciptu_asg = i."ISN_SIA_LANCIPTU_ASG"
+                WHERE sl.simulacao_id = :sid
                 GROUP BY 1 ORDER BY 1
             """), {"sid": str(simulacao_id)}).mappings().all()
             
