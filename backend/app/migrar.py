@@ -292,6 +292,15 @@ def migrar():
         except Exception as e:
             print(f"Erro ao sanear sim_faixas_aliquota: {e}")
 
+        # Criar índices de performance adicionais se não existirem
+        print("Criando índices de performance adicionais...")
+        try:
+            conn.execute(text("CREATE INDEX IF NOT EXISTS idx_sim_lancamentos_isn ON sim_lancamentos(isn_sia_lanciptu_asg)"))
+            conn.commit()
+            print("Índice idx_sim_lancamentos_isn verificado/criado com sucesso.")
+        except Exception as e:
+            print(f"Erro ao criar índice idx_sim_lancamentos_isn: {e}")
+
     print("Migração concluída.")
 
 if __name__ == "__main__":

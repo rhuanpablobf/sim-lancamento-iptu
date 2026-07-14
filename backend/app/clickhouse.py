@@ -222,9 +222,9 @@ def sincronizar_simulacao_para_clickhouse(simulacao_id, db_session):
     query = text("""
         WITH tipos AS (
             SELECT 
-                "ISN_SIA_LANCIPTU_ASG",
+                t."ISN_SIA_LANCIPTU_ASG",
                 STRING_AGG(
-                    CASE "INFO_TIPO_EDF_LAN"
+                    CASE t."INFO_TIPO_EDF_LAN"
                         WHEN 1 THEN 'Casa'
                         WHEN 2 THEN 'Apartamento'
                         WHEN 3 THEN 'Barracão'
@@ -242,10 +242,15 @@ def sincronizar_simulacao_para_clickhouse(simulacao_id, db_session):
                         ELSE 'Não Mapeado'
                     END,
                     ' / '
-                    ORDER BY cnxarraycolumn
+                    ORDER BY t.cnxarraycolumn
                 ) AS tipo_edificacao
-            FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN"
-            GROUP BY 1
+            FROM "SIA_LANCIPTU_ASG_INFO_TIPO_EDF_LAN" t
+            WHERE t."ISN_SIA_LANCIPTU_ASG" IN (
+                SELECT DISTINCT s.isn_sia_lanciptu_asg 
+                FROM sim_lancamentos s 
+                WHERE s.simulacao_id = :sid
+            )
+            GROUP BY t."ISN_SIA_LANCIPTU_ASG"
         )
         SELECT 
             s.simulacao_id,
