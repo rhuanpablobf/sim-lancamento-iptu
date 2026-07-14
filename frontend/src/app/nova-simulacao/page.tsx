@@ -11,6 +11,7 @@ export default function NovaSimulacaoPage() {
   const [cenario, setCenario] = useState("SELIC");
   const [indexadorSocial, setIndexadorSocial] = useState("SELIC");
   const [indexadorMinimo, setIndexadorMinimo] = useState("SELIC");
+  const [indexadorValorVenal, setIndexadorValorVenal] = useState("IPCA");
   const [aplicarCap, setAplicarCap] = useState(true);
   const [tipoCap, setTipoCap] = useState("INFLACAO_MAIS_5");
   const [executando, setExecutando] = useState(false);
@@ -44,6 +45,7 @@ export default function NovaSimulacaoPage() {
           cenario: cenario,
           indexador_social: indexadorSocial,
           indexador_minimo: indexadorMinimo,
+          indexador_valor_venal: indexadorValorVenal,
           aplicar_cap: aplicarCap,
           tipo_cap: tipoCap,
         }),
@@ -216,6 +218,29 @@ export default function NovaSimulacaoPage() {
                       </div>
                     </div>
                   )}
+                </div>
+
+                <div className="form-group mb-32" style={{ marginTop: "24px" }}>
+                  <label className="form-label">Indexador de Atualização do Valor Venal</label>
+                  <div style={{ display: "flex", background: "var(--bg)", padding: "4px", borderRadius: "8px", border: "1px solid var(--border)" }}>
+                    <button type="button" 
+                      style={{ flex: 1, border: "none", padding: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                        background: indexadorValorVenal === 'IPCA' ? "white" : "none",
+                        color: indexadorValorVenal === 'IPCA' ? "var(--text)" : "var(--text-muted)",
+                        boxShadow: indexadorValorVenal === 'IPCA' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                      }}
+                      onClick={() => setIndexadorValorVenal('IPCA')}
+                    >IPCA (Padrão Inflação)</button>
+                    <button type="button"
+                      style={{ flex: 1, border: "none", padding: "8px", fontSize: "13px", fontWeight: 500, cursor: "pointer", borderRadius: "6px",
+                        background: indexadorValorVenal === 'SELIC' ? "white" : "none",
+                        color: indexadorValorVenal === 'SELIC' ? "var(--text)" : "var(--text-muted)",
+                        boxShadow: indexadorValorVenal === 'SELIC' ? "0 2px 4px rgba(0,0,0,0.05)" : "none"
+                      }}
+                      onClick={() => setIndexadorValorVenal('SELIC')}
+                    >SELIC</button>
+                  </div>
+                  <div className="form-hint">Indexador que corrige anualmente a base do valor venal dos imóveis da simulação.</div>
                 </div>
 
                 <div className="grid-2">

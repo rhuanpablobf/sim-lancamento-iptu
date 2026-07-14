@@ -100,6 +100,7 @@ class SimulacaoCriar(BaseModel):
     cenario: str = "SELIC"
     indexador_social: str = "SELIC"
     indexador_minimo: str = "SELIC"
+    indexador_valor_venal: str = "IPCA"
     aplicar_cap: bool = True
     tipo_cap: str = "INFLACAO_MAIS_5"
 

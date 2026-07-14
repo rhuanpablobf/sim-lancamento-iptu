@@ -14,6 +14,7 @@ interface SimulacaoMin {
   cenario?: string;
   indexador_social?: string;
   indexador_minimo?: string;
+  indexador_valor_venal?: string;
   aplicar_cap?: boolean;
   tipo_cap?: string;
   descricao?: string;
@@ -299,6 +300,7 @@ export default function ComparacaoPage() {
         flexDirection: "column",
         gap: "4px"
       }}>
+        <div><strong>Venal:</strong> {simAtiva?.indexador_valor_venal || "IPCA"}</div>
         <div><strong>Faixa:</strong> {paramsAno?.tipo_indice_faixa || simAtiva?.cenario || "—"}</div>
         <div><strong>Social:</strong> {paramsAno?.tipo_indice_social || simAtiva?.indexador_social || "—"}</div>
         <div><strong>Mínimo:</strong> {paramsAno?.tipo_indice_minimo || simAtiva?.indexador_minimo || "—"}</div>

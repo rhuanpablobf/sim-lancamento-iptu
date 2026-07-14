@@ -128,6 +128,7 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
             configs_base=configs_base,
             indexador_social=simulacao.indexador_social,
             indexador_minimo=simulacao.indexador_minimo,
+            indexador_valor_venal=getattr(simulacao, "indexador_valor_venal", "IPCA"),
             aplicar_cap=simulacao.aplicar_cap,
             tipo_cap=simulacao.tipo_cap,
             atualizar_progresso=atualizar_progresso,

@@ -64,6 +64,7 @@ def criar_simulacao(payload: SimulacaoCriar, db: Session = Depends(obter_sessao)
         cenario=payload.cenario.upper(),
         indexador_social=payload.indexador_social.upper(),
         indexador_minimo=payload.indexador_minimo.upper(),
+        indexador_valor_venal=payload.indexador_valor_venal.upper() if payload.indexador_valor_venal else "IPCA",
         aplicar_cap=payload.aplicar_cap,
         tipo_cap=payload.tipo_cap,
         status="PENDENTE",

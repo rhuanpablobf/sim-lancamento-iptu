@@ -75,6 +75,7 @@ class Simulacao(Base):
     cenario          = Column(String(10), nullable=False)  # SELIC | IPCA (para faixas)
     indexador_social = Column(String(10), default="SELIC") # SELIC | IPCA
     indexador_minimo = Column(String(10), default="SELIC") # SELIC | IPCA
+    indexador_valor_venal = Column(String(10), default="IPCA") # IPCA | SELIC
     aplicar_cap      = Column(Boolean, default=True)
     tipo_cap         = Column(String(20), default="INFLACAO_MAIS_5") # INFLACAO_MAIS_5 | APENAS_INFLACAO
     status           = Column(String(15), default="PENDENTE")

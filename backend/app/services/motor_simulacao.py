@@ -166,6 +166,7 @@ def simular_exercicio(
     indexador_minimo: str = "SELIC",
     aplicar_cap: bool = True,
     tipo_cap: str = "INFLACAO_MAIS_5",
+    indexador_valor_venal: str = "IPCA",
 ) -> tuple[pd.DataFrame, float, float]:
     """
     Processa um exercício completo, aplicando todas as regras do CTM Goiânia.
@@ -203,8 +204,10 @@ def simular_exercicio(
     # Flag em construção (Art. 178 IV)
     df["em_construcao"] = (df["TIPO_IMPOSTO_LAN"] == 2) & (df["INFO_OCUPACAO_LAN"] == 4)
 
-    # ETAPA 1 — Corrigir valor venal pelo IPCA
-    df["valr_venal_simulado"] = df["VALR_VENAL_LAN"].astype(float) * (1 + ipca)
+    # ETAPA 1 — Corrigir valor venal pelo indexador escolhido (IPCA ou SELIC)
+    idx_venal = indexador_valor_venal.lower()
+    taxa_venal = param.get(idx_venal, 0.0) / 100.0
+    df["valr_venal_simulado"] = df["VALR_VENAL_LAN"].astype(float) * (1 + taxa_venal)
 
     # ETAPA 2 — Enquadrar nas faixas projetadas para o novo exercício
     df = _enquadrar_faixas_vetorizado(df, faixas_novo, "valr_venal_simulado", "categoria_tributacao")
@@ -243,7 +246,7 @@ def simular_exercicio(
     
     # O valor de comparação para o IPTU Social deve ser corrigido pelo índice do ano
     # para manter a paridade com o valor venal simulado.
-    df["valr_venal_social_simulado"] = df["valr_venal_social_base"].astype(float) * (1 + ipca)
+    df["valr_venal_social_simulado"] = df["valr_venal_social_base"].astype(float) * (1 + taxa_venal)
     valr_venal_comparacao_social = df["valr_venal_social_simulado"]
 
     mask_social = (
@@ -303,6 +306,7 @@ def executar_motor_completo(
     configs_base: dict,
     indexador_social: str = "SELIC",
     indexador_minimo: str = "SELIC",
+    indexador_valor_venal: str = "IPCA",
     aplicar_cap: bool = True,
     tipo_cap: str = "INFLACAO_MAIS_5",
     atualizar_progresso: callable = None,
@@ -414,6 +418,7 @@ def executar_motor_completo(
             exercicio_base=exercicio_base,
             indexador_social=indexador_social,
             indexador_minimo=indexador_minimo,
+            indexador_valor_venal=indexador_valor_venal,
             aplicar_cap=aplicar_cap,
             tipo_cap=tipo_cap,
         )

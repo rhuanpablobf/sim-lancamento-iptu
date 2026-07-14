@@ -47,6 +47,7 @@ interface SimulacaoMin {
   cenario?: string;
   indexador_social?: string;
   indexador_minimo?: string;
+  indexador_valor_venal?: string;
   aplicar_cap?: boolean;
   tipo_cap?: string;
   descricao?: string;
@@ -521,6 +522,7 @@ export default function DashboardPage() {
                 <strong>Índices:</strong>{' '}
                 IPCA: {paramsAtivos?.ipca_ano !== undefined && paramsAtivos?.ipca_ano !== null ? `${paramsAtivos.ipca_ano}%` : '—'}{' '}
                 &bull; SELIC: {paramsAtivos?.selic_ano !== undefined && paramsAtivos?.selic_ano !== null ? `${paramsAtivos.selic_ano}%` : '—'}{' '}
+                &bull; Valor Venal: {simulacaoAtiva?.indexador_valor_venal || 'IPCA'}{' '}
                 &bull; Faixa de Alíquota: {paramsAtivos?.tipo_indice_faixa || simulacaoAtiva?.cenario || '—'}{' '}
                 &bull; IPTU Social: {paramsAtivos?.tipo_indice_social || simulacaoAtiva?.indexador_social || '—'}{' '}
                 &bull; Imposto Mínimo: {paramsAtivos?.tipo_indice_minimo || simulacaoAtiva?.indexador_minimo || '—'}{' '}

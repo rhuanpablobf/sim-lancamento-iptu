@@ -26,6 +26,7 @@ def migrar():
             "cenario": "VARCHAR(10)",
             "indexador_social": "VARCHAR(10) DEFAULT 'SELIC'",
             "indexador_minimo": "VARCHAR(10) DEFAULT 'SELIC'",
+            "indexador_valor_venal": "VARCHAR(10) DEFAULT 'IPCA'",
             "aplicar_cap": "BOOLEAN DEFAULT TRUE",
             "status": "VARCHAR(15) DEFAULT 'PENDENTE'",
             "total_imoveis": "INTEGER",
