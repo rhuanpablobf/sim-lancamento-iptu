@@ -75,7 +75,7 @@ def _calcular_limite_iptu_social(parametros: dict, configs_base: dict, exercicio
     
     idx_key = indexador.lower() # "selic" ou "ipca"
 
-    for ano in range(ano_base, exercicio):
+    for ano in range(ano_base + 1, exercicio + 1):
         valor_idx = parametros.get(ano, {}).get(idx_key, 0.0)
         limite *= (1 + valor_idx / 100.0)
     
@@ -92,7 +92,7 @@ def _calcular_imposto_minimo(parametros: dict, configs_base: dict, exercicio: in
 
     idx_key = indexador.lower() # "selic" ou "ipca"
 
-    for ano in range(ano_base, exercicio):
+    for ano in range(ano_base + 1, exercicio + 1):
         valor_idx = parametros.get(ano, {}).get(idx_key, 0.0)
         minimo *= (1 + valor_idx / 100.0)
         
