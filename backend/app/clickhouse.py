@@ -9,30 +9,25 @@ CLICKHOUSE_PORT = int(os.getenv("CLICKHOUSE_PORT", "8123"))
 CLICKHOUSE_USER = os.getenv("CLICKHOUSE_USER", "default")
 CLICKHOUSE_PASSWORD = os.getenv("CLICKHOUSE_PASSWORD", "")
 
-_client_global = None
-_client_lock = threading.Lock()
+_thread_local = threading.local()
 
 def obter_cliente():
-    """Retorna um cliente persistente de conexão com o ClickHouse (Singleton)."""
-    global _client_global
-    if _client_global is not None:
-        return _client_global
+    """Retorna um cliente de conexão com o ClickHouse para a thread atual (Thread-Local)."""
+    if getattr(_thread_local, "client", None) is not None:
+        return _thread_local.client
         
-    with _client_lock:
-        if _client_global is not None:
-            return _client_global
-        try:
-            _client_global = clickhouse_connect.get_client(
-                host=CLICKHOUSE_HOST,
-                port=CLICKHOUSE_PORT,
-                username=CLICKHOUSE_USER,
-                password=CLICKHOUSE_PASSWORD,
-                database="lancamento_iptu"
-            )
-            return _client_global
-        except Exception as e:
-            logging.error(f"Erro ao conectar no ClickHouse: {e}")
-            return None
+    try:
+        _thread_local.client = clickhouse_connect.get_client(
+            host=CLICKHOUSE_HOST,
+            port=CLICKHOUSE_PORT,
+            username=CLICKHOUSE_USER,
+            password=CLICKHOUSE_PASSWORD,
+            database="lancamento_iptu"
+        )
+        return _thread_local.client
+    except Exception as e:
+        logging.error(f"Erro ao conectar no ClickHouse: {e}")
+        return None
 
 def consultar_clickhouse(query, params=None):
     """Executa uma consulta no ClickHouse e retorna os resultados como lista de dicts."""
