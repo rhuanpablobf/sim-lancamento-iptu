@@ -521,6 +521,117 @@ def dashboard_simulacao(
             logging.error(f"Erro no fallback de predial_territorial: {ept}")
             predial_territorial_geral = []
 
+    # ─── Série Histórica de Arrecadação ──────────────────────────────────────
+    arrecadacao_historica = []
+    try:
+        arrecadacao_historica = consultar_clickhouse("""
+            SELECT exercicio, sum(valr_imposto) AS valor, count() AS imoveis
+            FROM (
+                SELECT exercicio, valr_imposto FROM lancamento_iptu.historico_lancamentos_analitico
+                UNION ALL
+                SELECT exercicio, valr_imposto FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
+            ) GROUP BY exercicio ORDER BY exercicio
+        """, {"sid": str(simulacao_id)})
+    except Exception:
+        pass
+
+    if not arrecadacao_historica:
+        try:
+            hist_arr = db.execute(text("""
+                SELECT "CODG_EXERCICIO_LAN" AS exercicio, 
+                       SUM("VALR_IMPOSTO_LAN") AS valor, 
+                       COUNT(*) AS imoveis
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
+                GROUP BY 1
+            """)).mappings().all()
+
+            sim_arr = db.execute(text("""
+                SELECT codg_exercicio_lan AS exercicio, 
+                       SUM(valr_imposto_final) AS valor, 
+                       COUNT(*) AS imoveis
+                FROM sim_lancamentos
+                WHERE simulacao_id = :sid
+                GROUP BY 1
+            """), {"sid": str(simulacao_id)}).mappings().all()
+            
+            arrecadacao_historica = [
+                {"exercicio": int(r["exercicio"]), "valor": float(r["valor"] or 0), "imoveis": int(r["imoveis"] or 0)}
+                for r in list(hist_arr) + list(sim_arr)
+            ]
+            arrecadacao_historica = sorted(arrecadacao_historica, key=lambda x: x["exercicio"])
+        except Exception as e_arr:
+            logging.error(f"Erro no fallback de arrecadacao_historica: {e_arr}")
+            arrecadacao_historica = []
+
+    # ─── Série Histórica de Volume de Lançamentos ────────────────────────────
+    volume_historico = []
+    try:
+        volume_historico = consultar_clickhouse("""
+            SELECT 
+                exercicio, 
+                count() AS total, 
+                countIf(tipo_lancamento = 0) AS normal,
+                countIf(tipo_lancamento = 1) AS isentos,
+                countIf(tipo_lancamento = 2) AS minimo,
+                countIf(tipo_lancamento = 3) AS social,
+                countIf(tipo_lancamento = 4) AS imunes
+            FROM (
+                SELECT exercicio, tipo_lancamento FROM lancamento_iptu.historico_lancamentos_analitico
+                UNION ALL
+                SELECT exercicio, tipo_lancamento FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
+            ) GROUP BY exercicio ORDER BY exercicio
+        """, {"sid": str(simulacao_id)})
+    except Exception:
+        pass
+
+    if not volume_historico:
+        try:
+            hist_vol = db.execute(text("""
+                SELECT 
+                    "CODG_EXERCICIO_LAN" AS exercicio, 
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 0 OR "TIPO_LANCAMENTO_LAN" IS NULL) AS normal,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" >= 2) AS isentos,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 2) AS minimo,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 3 OR ("TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" IS NULL)) AS social,
+                    COUNT(*) FILTER (WHERE "TIPO_LANCAMENTO_LAN" = 1 AND "INFO_POSICAO_FISCAL_LAN" = 1) AS imunes
+                FROM "SIA_LANCIPTU_ASG"
+                WHERE "CODG_EXERCICIO_LAN" IS NOT NULL
+                GROUP BY 1
+            """)).mappings().all()
+
+            sim_vol = db.execute(text("""
+                SELECT 
+                    codg_exercicio_lan AS exercicio, 
+                    COUNT(*) AS total,
+                    COUNT(*) FILTER (WHERE tipo_lancamento = 0) AS normal,
+                    COUNT(*) FILTER (WHERE tipo_lancamento = 1) AS isentos,
+                    COUNT(*) FILTER (WHERE tipo_lancamento = 2) AS minimo,
+                    COUNT(*) FILTER (WHERE tipo_lancamento = 3) AS social,
+                    COUNT(*) FILTER (WHERE tipo_lancamento = 4) AS imunes
+                FROM sim_lancamentos
+                WHERE simulacao_id = :sid
+                GROUP BY 1
+            """), {"sid": str(simulacao_id)}).mappings().all()
+            
+            volume_historico = [
+                {
+                    "exercicio": int(r["exercicio"]),
+                    "total": int(r["total"] or 0),
+                    "normal": int(r["normal"] or 0),
+                    "isentos": int(r["isentos"] or 0),
+                    "minimo": int(r["minimo"] or 0),
+                    "social": int(r["social"] or 0),
+                    "imunes": int(r["imunes"] or 0)
+                }
+                for r in list(hist_vol) + list(sim_vol)
+            ]
+            volume_historico = sorted(volume_historico, key=lambda x: x["exercicio"])
+        except Exception as e_vol:
+            logging.error(f"Erro no fallback de volume_historico: {e_vol}")
+            volume_historico = []
+
     return RespostaPadrao(dados={
         "exercicio_atual": exercicio,
         "exercicio_base": item.exercicio_base,
@@ -536,35 +647,14 @@ def dashboard_simulacao(
         },
         "categorias": categorias,
         "faixas": faixas,
-        "arrecadacao_historica": consultar_clickhouse("""
-            SELECT exercicio, sum(valr_imposto) AS valor, count() AS imoveis
-            FROM (
-                SELECT exercicio, valr_imposto FROM lancamento_iptu.historico_lancamentos_analitico
-                UNION ALL
-                SELECT exercicio, valr_imposto FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
-            ) GROUP BY exercicio ORDER BY exercicio
-        """, {"sid": str(simulacao_id)}),
-        "volume_historico": (v_hist := consultar_clickhouse("""
-            SELECT 
-                exercicio, 
-                count() AS total, 
-                countIf(tipo_lancamento = 0) AS normal,
-                countIf(tipo_lancamento = 1) AS isentos,
-                countIf(tipo_lancamento = 2) AS minimo,
-                countIf(tipo_lancamento = 3) AS social,
-                countIf(tipo_lancamento = 4) AS imunes
-            FROM (
-                SELECT exercicio, tipo_lancamento FROM lancamento_iptu.historico_lancamentos_analitico
-                UNION ALL
-                SELECT exercicio, tipo_lancamento FROM lancamento_iptu.sim_lancamentos_analitico WHERE simulacao_id = {sid:String}
-            ) GROUP BY exercicio ORDER BY exercicio
-        """, {"sid": str(simulacao_id)})),
+        "arrecadacao_historica": arrecadacao_historica,
+        "volume_historico": volume_historico,
         "series": {
-            "social": [{"exercicio": h["exercicio"], "valor": int(h["social"])} for h in v_hist],
-            "isentos": [{"exercicio": h["exercicio"], "valor": int(h["isentos"])} for h in v_hist],
-            "imunes": [{"exercicio": h["exercicio"], "valor": int(h["imunes"])} for h in v_hist],
-            "minimo": [{"exercicio": h["exercicio"], "valor": int(h["minimo"])} for h in v_hist],
-            "normal": [{"exercicio": h["exercicio"], "valor": int(h["normal"])} for h in v_hist]
+            "social": [{"exercicio": h["exercicio"], "valor": int(h.get("social", 0) or 0)} for h in volume_historico],
+            "isentos": [{"exercicio": h["exercicio"], "valor": int(h.get("isentos", 0) or 0)} for h in volume_historico],
+            "imunes": [{"exercicio": h["exercicio"], "valor": int(h.get("imunes", 0) or 0)} for h in volume_historico],
+            "minimo": [{"exercicio": h["exercicio"], "valor": int(h.get("minimo", 0) or 0)} for h in volume_historico],
+            "normal": [{"exercicio": h["exercicio"], "valor": int(h.get("normal", 0) or 0)} for h in volume_historico]
         },
         "predial_territorial": [
             {"exercicio": int(h["exercicio"]), "predial": int(h.get("predial", 0) or 0), "territorial": int(h.get("territorial", 0) or 0)}

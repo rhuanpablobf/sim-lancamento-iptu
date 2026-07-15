@@ -47,7 +47,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
-      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_HOST=iptu_clickhouse
       - CLICKHOUSE_USER=admin
       - CLICKHOUSE_PASSWORD=iptu_password
     depends_on:
@@ -73,7 +73,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
-      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_HOST=iptu_clickhouse
       - CLICKHOUSE_USER=admin
       - CLICKHOUSE_PASSWORD=iptu_password
     depends_on:

@@ -399,10 +399,11 @@ def executar_motor_completo(
         
         # Reportar progresso
         if atualizar_progresso:
+            processados_acumulados = (ano - 1 - exercicio_base) * len(df_corrente)
             atualizar_progresso(
                 exercicio_atual=ano,
                 total_imoveis=len(df_corrente),
-                total_processados=0,
+                total_processados=processados_acumulados,
                 status="PROCESSANDO"
             )
 
@@ -476,7 +477,11 @@ def executar_motor_completo(
         })
         
         if atualizar_progresso:
-            atualizar_progresso(exercicios_concluidos=exercicios_concluidos)
+            processados_acumulados = (ano - exercicio_base) * len(df_resultado)
+            atualizar_progresso(
+                total_processados=processados_acumulados,
+                exercicios_concluidos=exercicios_concluidos
+            )
 
         # Preparar base para o próximo ano e LIMPAR RAM
         cols_base_antigas = ["VALR_VENAL_LAN", "VALR_IMPOSTO_LAN", "valr_venal_social_base"]
