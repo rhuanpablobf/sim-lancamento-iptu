@@ -45,6 +45,10 @@ def migrar():
                     conn.commit()
                 except Exception as e:
                     print(f"Erro ao adicionar {col}: {e}")
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
 
         # Verificar sim_simulacoes
         colunas_simulacoes = [c["name"] for c in inspector.get_columns("sim_simulacoes")]
@@ -55,9 +59,14 @@ def migrar():
                 conn.commit()
             except Exception as e:
                 print(f"Erro ao adicionar tipo_cap em sim_simulacoes: {e}")
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
 
         # Corrigir sim_faixas_aliquota se necessário
-        colunas_faixas = [c["name"] for c in inspector.get_columns("sim_faixas_aliquota")]
+        colunas_faixas_detalhes = inspector.get_columns("sim_faixas_aliquota")
+        colunas_faixas = [c["name"] for c in colunas_faixas_detalhes]
         colunas_nec_faixas = {
             "origem": "VARCHAR(20) DEFAULT 'MANUAL'",
             "simulacao_id": "UUID REFERENCES sim_simulacoes(id) ON DELETE CASCADE",
@@ -72,15 +81,31 @@ def migrar():
                     conn.commit()
                 except Exception as e:
                     print(f"Erro ao adicionar {col} em sim_faixas_aliquota: {e}")
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
             else:
                 # Verificar se o tipo precisa de ajuste (especialmente o tamanho do VARCHAR)
                 if col == "origem":
-                    print(f"Ajustando tamanho da coluna {col} em sim_faixas_aliquota para VARCHAR(20)...")
-                    try:
-                        conn.execute(text(f"ALTER TABLE sim_faixas_aliquota ALTER COLUMN {col} TYPE VARCHAR(20)"))
-                        conn.commit()
-                    except Exception as e:
-                        print(f"Erro ao ajustar {col} em sim_faixas_aliquota: {e}")
+                    col_info = next((c for c in colunas_faixas_detalhes if c["name"] == col), None)
+                    precisa_ajuste = True
+                    if col_info and hasattr(col_info["type"], "length"):
+                        length = col_info["type"].length
+                        if length is not None and length >= 20:
+                            precisa_ajuste = False
+                    
+                    if precisa_ajuste:
+                        print(f"Ajustando tamanho da coluna {col} em sim_faixas_aliquota para VARCHAR(20)...")
+                        try:
+                            conn.execute(text(f"ALTER TABLE sim_faixas_aliquota ALTER COLUMN {col} TYPE VARCHAR(20)"))
+                            conn.commit()
+                        except Exception as e:
+                            print(f"Erro ao ajustar {col} em sim_faixas_aliquota: {e}")
+                            try:
+                                conn.rollback()
+                            except Exception:
+                                pass
 
         # Verificar sim_parametros
         colunas_params = [c["name"] for c in inspector.get_columns("sim_parametros")]
@@ -93,7 +118,8 @@ def migrar():
 
 
         # Verificar sim_lancamentos (onde ocorreu o erro relatado)
-        colunas_lancamentos = [c["name"] for c in inspector.get_columns("sim_lancamentos")]
+        colunas_lancamentos_detalhes = inspector.get_columns("sim_lancamentos")
+        colunas_lancamentos = [c["name"] for c in colunas_lancamentos_detalhes]
         colunas_nec_lan = {
             "isn_sia_lanciptu_asg": "BIGINT",
             "valr_venal_simulado": "NUMERIC(15, 2)",
@@ -117,16 +143,33 @@ def migrar():
                     conn.commit()
                 except Exception as e:
                     print(f"Erro ao adicionar {col} em sim_lancamentos: {e}")
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
             else:
                 # Corrigir tipos se necessário (especialmente faixas que eram INTEGER no init.sql)
                 if col in ["faixa_anterior", "faixa_atual"]:
-                    print(f"Verificando/Corrigindo tipo da coluna {col} em sim_lancamentos para VARCHAR(20)...")
-                    try:
-                        # Mudança segura de INTEGER para VARCHAR
-                        conn.execute(text(f"ALTER TABLE sim_lancamentos ALTER COLUMN {col} TYPE VARCHAR(20)"))
-                        conn.commit()
-                    except Exception as e:
-                        print(f"Erro ao ajustar tipo de {col} em sim_lancamentos: {e}")
+                    col_info = next((c for c in colunas_lancamentos_detalhes if c["name"] == col), None)
+                    precisa_ajuste = True
+                    if col_info:
+                        tipo_nome = str(col_info["type"]).upper()
+                        length = getattr(col_info["type"], "length", None)
+                        if "VARCHAR" in tipo_nome and length is not None and length >= 20:
+                            precisa_ajuste = False
+                    
+                    if precisa_ajuste:
+                        print(f"Verificando/Corrigindo tipo da coluna {col} em sim_lancamentos para VARCHAR(20)...")
+                        try:
+                            # Mudança segura de INTEGER para VARCHAR
+                            conn.execute(text(f"ALTER TABLE sim_lancamentos ALTER COLUMN {col} TYPE VARCHAR(20)"))
+                            conn.commit()
+                        except Exception as e:
+                            print(f"Erro ao ajustar tipo de {col} em sim_lancamentos: {e}")
+                            try:
+                                conn.rollback()
+                            except Exception:
+                                pass
 
         # Garantir que a tabela SIA_LANCIPTU_ASG exista com o schema COMPLETO
         tabelas_atuais = inspector.get_table_names()
@@ -291,6 +334,10 @@ def migrar():
                 print(f"Saneamento concluído: {res.rowcount} faixas base corrigidas.")
         except Exception as e:
             print(f"Erro ao sanear sim_faixas_aliquota: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
 
         # Criar índices de performance adicionais se não existirem
         print("Criando índices de performance adicionais...")
@@ -300,6 +347,10 @@ def migrar():
             print("Índice idx_sim_lancamentos_isn verificado/criado com sucesso.")
         except Exception as e:
             print(f"Erro ao criar índice idx_sim_lancamentos_isn: {e}")
+            try:
+                conn.rollback()
+            except Exception:
+                pass
 
     print("Migração concluída.")
 

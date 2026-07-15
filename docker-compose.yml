@@ -11,11 +11,11 @@ services:
       POSTGRES_PASSWORD: iptu_password
       POSTGRES_DB: lancamento-iptu
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./dadosCru:/dadosCru
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      # - ./dadosCru:/dadosCru
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U iptu_user -d lancamento-iptu"]
       interval: 10s
@@ -57,9 +57,9 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_started
-    volumes:
-      - ./backend:/app
-      - ./dados_iptu:/data
+#    volumes:
+#      - ./backend:/app
+#      - ./dados_iptu:/data
 
   worker:
     build:
@@ -83,9 +83,9 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_started
-    volumes:
-      - ./backend:/app
-      - ./dados_iptu:/data
+#    volumes:
+#      - ./backend:/app
+#      - ./dados_iptu:/data
 
   frontend:
     build:
@@ -100,10 +100,10 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
+#    volumes:
+#      - ./frontend:/app
+#      - /app/node_modules
+#      - /app/.next
 
   pgadmin:
     image: dpage/pgadmin4:latest
@@ -122,8 +122,8 @@ services:
     container_name: iptu_clickhouse
     restart: always
     ports:
-      - "8123:8123"
-      - "9000:9000"
+      - "8124:8123"
+      - "9001:9000"
     environment:
       - CLICKHOUSE_DB=lancamento_iptu
       - CLICKHOUSE_USER=admin
