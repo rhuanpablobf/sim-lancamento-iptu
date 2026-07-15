@@ -122,7 +122,6 @@ services:
     image: clickhouse/clickhouse-server:latest
     container_name: iptu_clickhouse
     restart: always
-    command: clickhouse-server --config-file=/etc/clickhouse-server/config.xml -- --listen_host=0.0.0.0
     ports:
       - "8124:8123"
       - "9001:9000"
