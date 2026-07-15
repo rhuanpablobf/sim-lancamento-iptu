@@ -22,7 +22,9 @@ def obter_cliente():
             port=CLICKHOUSE_PORT,
             username=CLICKHOUSE_USER,
             password=CLICKHOUSE_PASSWORD,
-            database="lancamento_iptu"
+            database="lancamento_iptu",
+            connect_timeout=10,
+            send_receive_timeout=20
         )
         return _thread_local.client
     except Exception as e:

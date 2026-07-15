@@ -540,4 +540,9 @@ def psql_insert_copy(table, conn, keys, data_iter):
     # Obter a conexão bruta do driver (psycopg2)
     dbapi_conn = conn.connection
     with dbapi_conn.cursor() as cur:
+        try:
+            # Acelera a inserção massiva em discos de VPS com baixo IOPS
+            cur.execute("SET local synchronous_commit = off;")
+        except Exception:
+            pass
         cur.copy_expert(sql=sql, file=s_buf)
