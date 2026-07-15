@@ -47,7 +47,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
-      - CLICKHOUSE_HOST=iptu_clickhouse
+      - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_USER=admin
       - CLICKHOUSE_PASSWORD=iptu_password
     depends_on:
@@ -73,7 +73,7 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - DATA_PATH=/data
-      - CLICKHOUSE_HOST=iptu_clickhouse
+      - CLICKHOUSE_HOST=clickhouse
       - CLICKHOUSE_USER=admin
       - CLICKHOUSE_PASSWORD=iptu_password
       - C_FORCE_ROOT=true
@@ -122,6 +122,7 @@ services:
     image: clickhouse/clickhouse-server:latest
     container_name: iptu_clickhouse
     restart: always
+    command: clickhouse-server --config-file=/etc/clickhouse-server/config.xml -- --listen_host=0.0.0.0
     ports:
       - "8124:8123"
       - "9001:9000"
