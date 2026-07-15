@@ -409,6 +409,7 @@ def executar_motor_completo(
 
         faixas_novo = faixas_por_ano.get(ano, [])
         
+        t_calc = time.time()
         df_resultado, valr_minimo, limite_social = simular_exercicio(
             df_base=df_corrente,
             faixas_base=faixas_ref,
@@ -423,8 +424,10 @@ def executar_motor_completo(
             aplicar_cap=aplicar_cap,
             tipo_cap=tipo_cap,
         )
+        print(f"[MOTOR] Cálculo do exercício {ano} em memória concluído em {time.time() - t_calc:.2f} segundos.")
 
         # Salvar parâmetros de auditoria
+        t_audit = time.time()
         from app.models import SimulacaoParametroUtilizado
         param_audit = SimulacaoParametroUtilizado(
             simulacao_id=uuid.UUID(simulacao_id),
@@ -439,8 +442,10 @@ def executar_motor_completo(
         )
         db.add(param_audit)
         db.commit()
+        print(f"[MOTOR] Parâmetros de auditoria salvos no Postgres em {time.time() - t_audit:.2f} segundos.")
 
         # 6. Salvamento Otimizado (COPY)
+        t_prep = time.time()
         df_insert = df_resultado[[
             "ISN_SIA_LANCIPTU_ASG", "CODG_INSCRICAO_LAN", "codg_exercicio_lan",
             "valr_venal_simulado", "valr_aliquota_calculada",
@@ -456,8 +461,11 @@ def executar_motor_completo(
         })
         df_insert["simulacao_id"] = simulacao_id
         df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
+        print(f"[MOTOR] DataFrame para banco preparado em {time.time() - t_prep:.2f} segundos.")
         
+        t_copy = time.time()
         df_insert.to_sql("sim_lancamentos", db.bind, if_exists="append", index=False, method=psql_insert_copy)
+        print(f"[MOTOR] {len(df_insert)} lançamentos inseridos via COPY no Postgres em {time.time() - t_copy:.2f} segundos.")
         
         # Estatísticas para o progresso
         tempo = round(time.time() - start_time, 2)

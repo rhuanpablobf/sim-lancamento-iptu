@@ -58,6 +58,7 @@ services:
       - CLICKHOUSE_HOST=iptu_clickhouse
       - CLICKHOUSE_USER=admin
       - CLICKHOUSE_PASSWORD=iptu_password
+      - C_FORCE_ROOT=true
     volumes:
       - /opt/dados_iptu:/data
     networks:

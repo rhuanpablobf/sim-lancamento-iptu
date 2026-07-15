@@ -21,4 +21,5 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="America/Sao_Paulo",
     enable_utc=True,
+    broker_connection_retry_on_startup=True,
 )
