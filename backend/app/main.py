@@ -10,14 +10,20 @@ from app.migrar import migrar
 from app.clickhouse import inicializar_clickhouse
 
 # Executa migrações de schema customizadas (adiciona colunas faltantes)
+print("[DEBUG BOOT] Executando migrar()...", flush=True)
 migrar()
+print("[DEBUG BOOT] migrar() concluido.", flush=True)
 
 # Cria as tabelas caso não existam (útil quando init.sql não roda)
+print("[DEBUG BOOT] Criando tabelas no Postgres...", flush=True)
 Base.metadata.create_all(bind=engine)
+print("[DEBUG BOOT] Tabelas do Postgres criadas.", flush=True)
 
 # Inicializa ClickHouse (Schema Analítico)
 try:
+    print("[DEBUG BOOT] Conectando/Inicializando Clickhouse...", flush=True)
     inicializar_clickhouse()
+    print("[DEBUG BOOT] Clickhouse pronto.", flush=True)
 except Exception as e:
     print(f"Aviso: ClickHouse não disponível no momento: {e}")
 
