@@ -299,6 +299,7 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
 
         # Se ClickHouse estiver vazio, usa o fallback do Postgres (Original)
         if not dados_click or dados_click[0]['total_imoveis'] == 0:
+            data_source = "PostgreSQL"
             # [LOGICA ORIGINAL DO POSTGRES PARA FALLBACK]
             kpis = db.execute(text("""
                 SELECT COUNT(*) AS total_imoveis,
@@ -350,6 +351,7 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 GROUP BY 1 ORDER BY 1
             """)).mappings().all()
         else:
+            data_source = "ClickHouse"
             # Usa dados do ClickHouse para o restante das queries (MUITO RÁPIDO)
             kpis = dados_click[0]
 
@@ -506,7 +508,7 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 import logging
                 logging.error(f"Erro ao salvar cache de migracao_trava no ClickHouse: {e}")
 
-        return RespostaPadrao(dados={
+        dados_retorno = {
             "exercicio_atual": ex,
             "kpis": dict(kpis),
             "categorias": [dict(r) for r in categorias],
@@ -529,7 +531,8 @@ def dashboard_metricas(exercicio: str = Query(None), db: Session = Depends(obter
                 [{"exercicio": 2022, "subiu_faixa": 0, "desceu_faixa": 0, "travado_cap": 0, "abaixo_trava": 0}]
                 if not any(r.get("exercicio") == 2022 for r in migracao_trava_dados) else []
             ) + [dict(r) for r in migracao_trava_dados]
-        })
+        }
+        return RespostaPadrao(dados=dados_retorno, meta={"data_source": data_source})
     except Exception as e:
         return RespostaPadrao(dados={}, meta={"mensagem": str(e)})
 

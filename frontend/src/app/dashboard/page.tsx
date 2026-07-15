@@ -287,6 +287,7 @@ export default function DashboardPage() {
   const d = data?.dados;
   const kpis = d?.kpis || null;
   const ant = d?.kpis_anterior || null;
+  const dataSource = data?.meta?.data_source;
 
   const urlConsolidado = contexto === "base"
     ? "/api/importacao/dashboard/consolidado-faixas"
@@ -448,10 +449,30 @@ export default function DashboardPage() {
             <div className="page-title">
               {contexto === "base" ? `Dashboard · Base Real ${anoSelecionado || d.exercicio_atual}` : `Dashboard · Projeção ${anoSelecionado}`}
             </div>
-            <div className="page-subtitle">
-              {contexto === "base" 
-                ? "Visão analítica da base importada de lançamentos" 
-                : "Impacto projetado conforme regras do cenário selecionado"}
+            <div className="page-subtitle" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+              <span>
+                {contexto === "base" 
+                  ? "Visão analítica da base importada de lançamentos" 
+                  : "Impacto projetado conforme regras do cenário selecionado"}
+              </span>
+              {dataSource && (
+                <span 
+                  className={`badge ${dataSource === 'ClickHouse' ? 'badge-success' : 'badge-warning'}`}
+                  style={{ 
+                    fontSize: '10px', 
+                    padding: '2px 6px', 
+                    fontWeight: 600,
+                    textTransform: 'uppercase',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    borderRadius: '4px'
+                  }}
+                  title={dataSource === 'ClickHouse' ? 'Carregado do banco analítico ClickHouse (Ultra Rápido)' : 'Carregado do PostgreSQL (Fallback / Lento)'}
+                >
+                  {dataSource === 'ClickHouse' ? '⚡ ClickHouse' : '⚠️ Postgres (Fallback)'}
+                </span>
+              )}
             </div>
           </div>
           <div className="flex-gap-8">

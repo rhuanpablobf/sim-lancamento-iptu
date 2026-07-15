@@ -293,6 +293,7 @@ def dashboard_simulacao(
 
     # Fallback se CH estiver vazio
     if not kpis_click or kpis_click[0]['total_imoveis'] == 0:
+        data_source = "PostgreSQL"
         kpis = db.execute(text("""
             SELECT COUNT(*) AS total_imoveis,
                    COUNT(*) FILTER (WHERE s.tipo_lancamento = 0) AS normal,
@@ -336,6 +337,7 @@ def dashboard_simulacao(
             GROUP BY 1 ORDER BY 1
         """), {"sid": str(simulacao_id), "ano": exercicio}).mappings()]
     else:
+        data_source = "ClickHouse"
         kpis = kpis_click[0]
         categorias = consultar_clickhouse("""
             SELECT categoria, count() AS total, sum(valr_venal_simulado) AS venal_total, sum(valr_imposto) AS imposto_total
@@ -632,7 +634,7 @@ def dashboard_simulacao(
             logging.error(f"Erro no fallback de volume_historico: {e_vol}")
             volume_historico = []
 
-    return RespostaPadrao(dados={
+    dados_retorno = {
         "exercicio_atual": exercicio,
         "exercicio_base": item.exercicio_base,
         "kpis": {
@@ -661,7 +663,8 @@ def dashboard_simulacao(
             for h in predial_territorial_geral
         ],
         "migracao_trava": dados_migracao_trava
-    })
+    }
+    return RespostaPadrao(dados=dados_retorno, meta={"data_source": data_source})
 
 
 @router.get("/{simulacao_id}/anos", summary="Anos disponíveis na simulação")
@@ -774,7 +777,7 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
                         resultado[cat] = dict(sorted(resultado[cat].items(), key=lambda x: x[1]["ordem"]))
 
                     response.headers["X-Data-Source"] = "ClickHouse"
-                    return RespostaPadrao(dados=resultado)
+                    return RespostaPadrao(dados=resultado, meta={"data_source": "ClickHouse"})
                 else:
                     logging.warning(f"ClickHouse retornou vazio para {simulacao_id}, recorrendo ao Postgres.")
             except Exception as e_ch:
@@ -853,7 +856,7 @@ def consolidado_faixas(simulacao_id: UUID, response: Response, db: Session = Dep
             resultado[cat] = dict(sorted(resultado[cat].items(), key=lambda x: x[1]["ordem"]))
 
         response.headers["X-Data-Source"] = "PostgreSQL"
-        return RespostaPadrao(dados=resultado)
+        return RespostaPadrao(dados=resultado, meta={"data_source": "PostgreSQL"})
     except Exception as e:
         logging.error(f"CRÍTICO: Erro em consolidado-faixas ({simulacao_id}): {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno ao processar faixas: {str(e)}")
@@ -905,7 +908,7 @@ def resumo_consolidado_exercicios(simulacao_id: UUID, response: Response, db: Se
                             "total_imposto": float(row[6])
                         })
                     response.headers["X-Data-Source"] = "ClickHouse"
-                    return RespostaPadrao(dados=resumo)
+                    return RespostaPadrao(dados=resumo, meta={"data_source": "ClickHouse"})
             except Exception as e_ch:
                 logging.error(f"Erro ao consultar resumo no ClickHouse: {e_ch}. Recorrendo ao Postgres.")
 
@@ -941,7 +944,7 @@ def resumo_consolidado_exercicios(simulacao_id: UUID, response: Response, db: Se
         if base_real: resumo.append(dict(base_real))
         for r in simulado: resumo.append(dict(r))
         response.headers["X-Data-Source"] = "PostgreSQL"
-        return RespostaPadrao(dados=resumo)
+        return RespostaPadrao(dados=resumo, meta={"data_source": "PostgreSQL"})
     except Exception as e:
         logging.error(f"CRÍTICO: Erro em resumo-consolidado ({simulacao_id}): {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -983,7 +986,7 @@ def distribuicao_edificacao_sim(
                         if lan_label in matriz[edf]:
                             matriz[edf][lan_label] = int(qtd)
                     response.headers["X-Data-Source"] = "ClickHouse"
-                    return RespostaPadrao(dados=matriz)
+                    return RespostaPadrao(dados=matriz, meta={"data_source": "ClickHouse"})
             except Exception as e_ch:
                 logging.error(f"Erro ao consultar ClickHouse (edificacao): {e_ch}. Recorrendo ao Postgres.")
 
@@ -1017,7 +1020,7 @@ def distribuicao_edificacao_sim(
                 matriz[edf] = {"Normal": 0, "Isento": 0, "Imposto Mínimo": 0, "IPTU Social": 0, "Imunidade": 0}
             if lan_label in matriz[edf]: matriz[edf][lan_label] = int(r["quantidade"])
         response.headers["X-Data-Source"] = "PostgreSQL"
-        return RespostaPadrao(dados=matriz)
+        return RespostaPadrao(dados=matriz, meta={"data_source": "PostgreSQL"})
     except Exception as e:
         logging.error(f"Erro na distribuição por edificação (sim): {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
