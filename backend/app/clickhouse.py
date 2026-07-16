@@ -124,6 +124,10 @@ def sincronizar_historico_para_clickhouse(db_session):
 
     logging.info("Sincronizando histórico para ClickHouse...")
     
+    # Garante que as tabelas existam antes de tentar fazer TRUNCATE
+    # Isso protege contra o caso em que o ClickHouse subiu depois do backend
+    inicializar_clickhouse()
+    
     # Query que traz os tipos de edificação formatados
     query = text("""
         WITH tipos AS (
@@ -202,8 +206,6 @@ def sincronizar_historico_para_clickhouse(db_session):
                     logging.info(f"Lote de histórico enviado: {len(chunk_df)} registros.")
 
         logging.info("Sincronização de histórico concluída.")
-    except Exception as e:
-        logging.error(f"Erro ao sincronizar histórico: {e}")
     except Exception as e:
         logging.error(f"Erro ao sincronizar histórico: {e}")
 
