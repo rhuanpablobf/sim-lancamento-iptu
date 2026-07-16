@@ -134,7 +134,6 @@ export default function ImportacaoPage() {
     xhr.send(fd);
   }
 
-  const BASE = getBase();
 
   // Recuperar task pendente ao carregar
   useEffect(() => {
@@ -147,7 +146,7 @@ export default function ImportacaoPage() {
 
   // Monitoramento da Task via SWR
   useSWR(
-    taskId ? `${BASE}/api/importacao/task/${taskId}` : null,
+    taskId ? `/api/importacao/task/${taskId}` : null,
     fetcher,
     { 
       refreshInterval: 3000,
