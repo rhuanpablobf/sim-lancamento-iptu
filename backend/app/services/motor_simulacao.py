@@ -353,7 +353,23 @@ def executar_motor_completo(
     # 3. Carregamento ÚNICO da base (Super Rápido)
     print(f"Carregando base total de {total_imoveis} imóveis...")
     df_base_total = pd.read_sql(f"""
-        SELECT t1.*, t2."INFO_TIPO_EDF_LAN"
+        SELECT
+            t1."ISN_SIA_LANCIPTU_ASG",
+            CAST(t1."CODG_INSCRICAO_LAN" AS TEXT) AS "CODG_INSCRICAO_LAN",
+            t1."CODG_EXERCICIO_LAN",
+            t1."TIPO_IMPOSTO_LAN",
+            t1."INFO_USO_LAN",
+            t1."INFO_OCUPACAO_LAN",
+            t1."INFO_POSICAO_FISCAL_LAN",
+            t1."INFO_CPF_CGC_LAN",
+            t1."CODG_EDIFICIO_LAN",
+            t1."VALR_VENAL_LAN",
+            t1."VALR_ALIQUOTA_LAN",
+            t1."VALR_IMPOSTO_LAN",
+            t1."VALR_TOTAL_LAN",
+            t1.faixa_codigo,
+            t1.faixa_label,
+            t2."INFO_TIPO_EDF_LAN"
         FROM "SIA_LANCIPTU_ASG" t1
         LEFT JOIN (
             SELECT "ISN_SIA_LANCIPTU_ASG", MIN("INFO_TIPO_EDF_LAN") as "INFO_TIPO_EDF_LAN"
@@ -461,6 +477,13 @@ def executar_motor_completo(
         })
         df_insert["simulacao_id"] = simulacao_id
         df_insert["id"] = [uuid.uuid4() for _ in range(len(df_insert))]
+        # Garante que a inscricao seja string inteira limpa (sem '.0' do float64 do Pandas)
+        df_insert["codg_inscricao_lan"] = (
+            df_insert["codg_inscricao_lan"]
+            .astype(str)
+            .str.replace(r'\.0$', '', regex=True)
+            .str.strip()
+        )
         print(f"[MOTOR] DataFrame para banco preparado em {time.time() - t_prep:.2f} segundos.")
         
         t_copy = time.time()
