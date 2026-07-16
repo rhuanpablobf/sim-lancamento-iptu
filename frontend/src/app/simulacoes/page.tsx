@@ -20,10 +20,11 @@ interface Simulacao {
 }
 
 const BADGE_STATUS: Record<string, { classe: string; dot: string; label: string }> = {
-  CONCLUIDO:   { classe: "badge-green", dot: "green", label: "Concluído" },
-  PROCESSANDO: { classe: "badge-amber", dot: "blue",  label: "Processando" },
-  PENDENTE:    { classe: "badge-gray",  dot: "gray",  label: "Pendente" },
-  ERRO:        { classe: "badge-red",   dot: "amber", label: "Erro" },
+  CONCLUIDO:     { classe: "badge-green",  dot: "green", label: "Concluído" },
+  PROCESSANDO:   { classe: "badge-amber",  dot: "blue",  label: "Processando" },
+  SINCRONIZANDO: { classe: "badge-amber",  dot: "blue",  label: "Sincronizando..." },
+  PENDENTE:      { classe: "badge-gray",   dot: "gray",  label: "Pendente" },
+  ERRO:          { classe: "badge-red",    dot: "amber", label: "Erro" },
 };
 
 export default function SimulacoesPage() {
@@ -37,12 +38,13 @@ export default function SimulacoesPage() {
   const simulacoes = data?.dados ?? [];
   const resumo = {
     total: simulacoes.length,
-    processando: simulacoes.filter(s => s.status === 'PROCESSANDO').length,
+    processando: simulacoes.filter(s => s.status === 'PROCESSANDO' || s.status === 'SINCRONIZANDO').length,
     concluidas: simulacoes.filter(s => s.status === 'CONCLUIDO').length
   };
 
   const calcularProgresso = (s: Simulacao) => {
     if (s.status === 'CONCLUIDO') return 100;
+    if (s.status === 'SINCRONIZANDO') return 99;
     if (s.status === 'PENDENTE' || !s.total_imoveis) return 0;
     
     const numAnos = (s.exercicio_destino - s.exercicio_base);

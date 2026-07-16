@@ -137,7 +137,6 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
         # 5. Sincronizar com ClickHouse para Dashboard Ultrarápido
         try:
             msg_ch = '[CLICKHOUSE] Sincronizando resultados para o Dashboard...'
-            atualizar_progresso(mensagem=msg_ch)
             self.update_state(state='PROGRESS', meta={'progresso': 99, 'mensagem': msg_ch})
             sincronizar_simulacao_para_clickhouse(simulacao_id, db)
             
@@ -147,6 +146,9 @@ def executar_simulacao(self, simulacao_id: str) -> dict:
         except Exception as e:
             import logging
             logging.error(f"Erro ao sincronizar com ClickHouse: {e}")
+
+        # 6. Marcar como CONCLUIDO apenas após toda a sincronização terminar
+        atualizar_progresso(status="CONCLUIDO", mensagem="Processamento concluído")
 
         return {"status": "CONCLUIDO", "simulacao_id": simulacao_id}
 

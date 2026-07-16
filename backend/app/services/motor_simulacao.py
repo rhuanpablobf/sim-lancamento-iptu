@@ -511,7 +511,7 @@ def executar_motor_completo(
 
     print("Simulação concluída com sucesso!")
     if atualizar_progresso:
-        atualizar_progresso(status="CONCLUIDO", exercicios_concluidos=exercicios_concluidos)
+        atualizar_progresso(status="SINCRONIZANDO", mensagem="[CLICKHOUSE] Sincronizando resultados para o Dashboard...", exercicios_concluidos=exercicios_concluidos)
     return True
 
 

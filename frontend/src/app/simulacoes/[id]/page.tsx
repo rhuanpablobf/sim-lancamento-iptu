@@ -29,10 +29,11 @@ interface SimulacaoDetalhe {
 }
 
 const BADGE_STATUS: Record<string, { classe: string; dot: string; label: string }> = {
-  CONCLUIDO:   { classe: "badge-green", dot: "green", label: "Concluído" },
-  PROCESSANDO: { classe: "badge-amber", dot: "blue",  label: "Processando" },
-  PENDENTE:    { classe: "badge-gray",  dot: "gray",  label: "Pendente" },
-  ERRO:        { classe: "badge-red",   dot: "amber", label: "Erro" },
+  CONCLUIDO:     { classe: "badge-green",  dot: "green", label: "Concluído" },
+  PROCESSANDO:   { classe: "badge-amber",  dot: "blue",  label: "Processando" },
+  SINCRONIZANDO: { classe: "badge-amber",  dot: "blue",  label: "Sincronizando..." },
+  PENDENTE:      { classe: "badge-gray",   dot: "gray",  label: "Pendente" },
+  ERRO:          { classe: "badge-red",    dot: "amber", label: "Erro" },
 };
 
 const fmtMoeda = (n: number) => n.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
