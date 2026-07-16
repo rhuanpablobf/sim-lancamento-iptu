@@ -169,7 +169,7 @@ export default function SimulacoesPage() {
                         <td className="right fw-500">{s.exercicio_base}</td>
                         <td className="right fw-500" style={{ color: "var(--blue-txt)" }}>{s.exercicio_destino}</td>
                         <td>
-                          {s.status === 'PROCESSANDO' || s.status === 'PENDENTE' ? (
+                          {s.status === 'PROCESSANDO' || s.status === 'PENDENTE' || s.status === 'SINCRONIZANDO' ? (
                             <div style={{ width: '100%', minWidth: '180px' }}>
                               <div style={{ width: "100%", height: "18px", background: "var(--surface-3)", borderRadius: "9px", position: "relative", overflow: "hidden", border: "1px solid var(--border)" }}>
                                 <div style={{ height: "100%", background: "linear-gradient(90deg, var(--blue) 0%, var(--blue-mid) 100%)", transition: "width 0.5s ease", width: `${pct}%` }}></div>

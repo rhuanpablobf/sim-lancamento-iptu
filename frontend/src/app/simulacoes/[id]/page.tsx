@@ -56,7 +56,7 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
     {
       refreshInterval: (data) => {
         const status = data?.dados?.status;
-        return status === "PROCESSANDO" || status === "PENDENTE" ? 2000 : 0;
+        return status === "PROCESSANDO" || status === "PENDENTE" || status === "SINCRONIZANDO" ? 2000 : 0;
       },
     }
   );
@@ -96,7 +96,7 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
                   <span className="badge badge-gray">{sim.exercicio_base} → {sim.exercicio_destino}</span>
                   {badge && (
                     <span className={`badge ${badge.classe}`}>
-                      <span className={`status-dot ${badge.dot} ${sim.status === 'PROCESSANDO' ? 'pulse' : ''}`}></span>
+                      <span className={`status-dot ${badge.dot} ${(sim.status === 'PROCESSANDO' || sim.status === 'SINCRONIZANDO') ? 'pulse' : ''}`}></span>
                       {badge.label}
                     </span>
                   )}
@@ -109,7 +109,7 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
             {sim?.status === 'CONCLUIDO' && (
               <button onClick={() => router.push(`/dashboard?contexto=${id}`)} className="btn btn-primary btn-sm">Abrir Dashboard</button>
             )}
-            {sim && sim.status !== 'PROCESSANDO' && (
+            {sim && sim.status !== 'PROCESSANDO' && sim.status !== 'SINCRONIZANDO' && (
               <button onClick={excluir} className="btn btn-ghost btn-sm" style={{ color: "var(--red)" }} disabled={excluindo}>
                 {excluindo ? "Apagando..." : "Excluir"}
               </button>
@@ -121,16 +121,16 @@ export default function DetalheSimulacaoPage({ params }: { params: Promise<{ id:
       <div className="page-content">
         <div className="row">
           <div style={{ flex: 1 }}>
-            {(sim?.status === 'PROCESSANDO' || sim?.status === 'PENDENTE') && (
+            {(sim?.status === 'PROCESSANDO' || sim?.status === 'PENDENTE' || sim?.status === 'SINCRONIZANDO') && (
               <div className="card mb-24" style={{ background: "var(--blue-light)", border: "1px solid var(--blue-mid)" }}>
                 <div className="card-header"><div className="card-title">Monitoramento de Execução</div></div>
                 <div className="card-body">
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
                     <span className="text-sm fw-600" style={{ color: "var(--blue-txt)" }}>
-                      {sim.exercicio_atual ? `Processando exercício ${sim.exercicio_atual}...` : "Iniciando motor de cálculo..."}
+                      {sim.status === 'SINCRONIZANDO' ? "Sincronizando com o Dashboard..." : (sim.exercicio_atual ? `Processando exercício ${sim.exercicio_atual}...` : "Iniciando motor de cálculo...")}
                     </span>
                     <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                      {sim?.status === 'PROCESSANDO' && sim?.criado_em && (
+                      {(sim?.status === 'PROCESSANDO' || sim?.status === 'SINCRONIZANDO') && sim?.criado_em && (
                         <span className="text-xs" style={{ color: "var(--blue-txt)", opacity: 0.7 }}>
                           ⏱️ {(() => {
                             const inicio = new Date(sim.criado_em).getTime();
